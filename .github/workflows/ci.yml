@@ -1,0 +1,99 @@
+# Tests on multiple OSes + cross-compile matrix (linux/darwin/windows × amd64/arm64).
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            race: "1"
+          - os: macos-latest
+            race: "1"
+          - os: windows-latest
+            race: "0"
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Unit tests
+        run: |
+          if [ "${{ matrix.race }}" = "1" ]; then
+            go test ./... -short -count=1 -race
+          else
+            go test ./... -short -count=1
+          fi
+        shell: bash
+
+      - name: Vet
+        run: go vet ./...
+
+  cross-build:
+    name: cross-build (${{ matrix.goos }}/${{ matrix.goarch }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - goos: linux
+            goarch: amd64
+          - goos: linux
+            goarch: arm64
+          - goos: darwin
+            goarch: amd64
+          - goos: darwin
+            goarch: arm64
+          - goos: windows
+            goarch: amd64
+          - goos: windows
+            goarch: arm64
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Build
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: "0"
+        shell: bash
+        run: |
+          VERSION=$(git describe --tags --always --dirty 2>/dev/null || echo dev)
+          COMMIT=$(git rev-parse --short HEAD 2>/dev/null || echo local)
+          OUT="dq-${GOOS}-${GOARCH}"
+          [ "$GOOS" = windows ] && OUT="${OUT}.exe"
+          go build -trimpath \
+            -ldflags "-s -w -X github.com/SomniSom/docker-ops/internal/version.Version=${VERSION} -X github.com/SomniSom/docker-ops/internal/version.Commit=${COMMIT}" \
+            -o "$OUT" ./cmd/dq
+          ls -la "$OUT"
+
+  goreleaser-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - uses: goreleaser/goreleaser-action@v6
+        with:
+          distribution: goreleaser
+          version: "~> v2"
+          args: check

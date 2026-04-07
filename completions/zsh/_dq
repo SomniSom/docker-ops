@@ -1,0 +1,43 @@
+#compdef dq
+# Установка: fpath=(/path/to/клон-репозитория/completions/zsh $fpath); autoload -Uz _dq; compdef _dq dq
+
+local -a _dq_cmds
+_dq_cmds=(
+	'version:версия'
+	'validate:проверка конфига'
+	'env:шаблон docker-ops.yaml'
+	'config-check:проверка app_config'
+	'build:docker compose build'
+	'pull:docker compose pull'
+	'up:docker compose up -d'
+	'down:docker compose down'
+	'reup:build и up'
+	'ps:docker compose ps'
+	'restart:перезапуск сервиса'
+	'exec:docker compose exec'
+	'status:ps и логи'
+	'logs:логи follow'
+	'logs-tail:хвост логов'
+	'deploy:деплой по SSH'
+	'gen-image-compose:docker-compose.image.yml'
+	'completion:скрипт автодополнения'
+	'man:man-страницы'
+	'help:справка'
+)
+
+if (( CURRENT == 2 )); then
+	_describe -t commands 'команда' _dq_cmds
+	return
+fi
+
+local sub=$words[2]
+if [[ $sub == env ]]; then
+	_arguments -s \
+		'(-h --help)'{-h,--help}'[справка по env]' \
+		'(-a --anonymize)'{-a,--anonymize}'[не подставлять REMOTE_* из окружения]' \
+		'(-f --force)'{-f,--force}'[перезаписать файл]' \
+		'(-o --output)'{-o,--output}'[файл вывода]:файл:_files'
+	return
+fi
+
+return

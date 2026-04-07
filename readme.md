@@ -1,7 +1,7 @@
 # Техническое задание: **dq** — Docker Quick-ops
 
-**Статус:** проектирование (черновик ТЗ).  
-**Текущая база:** реализация на Bash + Python (`scripts/docker-ops.sh`, `docker-ops-remote-load.py`) в этом репозитории.
+**Статус:** реализация на Go (черновик ТЗ в этом файле).  
+**Исполняемый CLI:** бинарник **`dq`** в репозитории; Bash/Python-обвязка удалена.
 
 **Полное название продукта:** **Docker Quick-ops** (бинарник: `dq`).
 
@@ -9,14 +9,13 @@
 
 ## 1. Обоснование и цели
 
-### 1.1 Проблема
+### 1.1 Проблема (исторически)
 
-- Текущий стек тянет **Bash**, вызовы **rsync/ssh/scp**, отдельный **Python** только для чтения YAML-конфига удалённого доступа.
-- На разных хостах отличаются версии Bash, наличие `python3`/PyYAML, поведение `rsync`, что усложняет «одинаково работает везде».
+- Прежний стек на **Bash**, **rsync/ssh/scp** и **Python** для YAML давал расхождения между окружениями.
 
 ### 1.2 Цель
 
-Получить **один статически собираемый бинарник `dq`**, воспроизводящий функциональность нынешнего Bash-скрипта, с:
+**Один статически собираемый бинарник `dq`**, который:
 
 - конфигурацией в `**docker-ops.yaml**` или `**docker-ops.yml**` только в **корне проекта** (без альтернативных путей вроде `scripts/`);
 - секретами и чувствительными значениями в отдельном `**dq.env`** (в `**.gitignore`**), подмешиваемом к настройкам;
@@ -27,7 +26,7 @@
 
 ### 1.3 Нефункциональные ожидания
 
-- Максимальная **самодостаточность рантайма**: не требовать Python; не требовать внешний `rsync` на клиенте.
+- **Самодостаточность рантайма**: без Python и без обязательного `rsync` на клиенте.
 - Предсказуемое поведение и понятные сообщения об ошибках.
 - Версионируемые релизы (теги, changelog — по решению).
 
@@ -119,7 +118,7 @@
 | UX         | `help_show_effective` и др. по необходимости                                                                                                                                                                                            |
 
 
-### 5.3 Команды (паритет с текущим Bash)
+### 5.3 Команды CLI
 
 
 | Команда                                                | Локально                                                                           | Удалённо                                 |
@@ -156,6 +155,7 @@
 
 ## 7. Сборка и поставка
 
+- Модуль Go: **`github.com/SomniSom/docker-ops`** (репозиторий: https://github.com/SomniSom/docker-ops). Установка из исходников: `go install github.com/SomniSom/docker-ops/cmd/dq@latest`.
 - `go build -o dq` / `make build` — см. **Makefile** (`VERSION`, `GIT_COMMIT`, ldflags → `internal/version`).
 - **Матрица OS/arch:** в **GitHub Actions** (`.github/workflows/ci.yml`) — тесты на Linux / macOS / Windows и кросс-сборка `linux|darwin|windows` × `amd64|arm64`.
 - **GoReleaser** (`.goreleaser.yaml`): те же целевые платформы, архивы (`tar.gz` / `zip` для Windows), **`checksums.txt`**. Локально: `make goreleaser-check`, снимок без релиза: `make goreleaser-snapshot` (нужен установленный [goreleaser](https://goreleaser.com/install/)). Релиз на GitHub: тег **`v*`** → workflow **`.github/workflows/release.yml`**.
@@ -175,7 +175,7 @@
 
 ## 9. Безопасность SSH
 
-- Поведение **как в текущем Bash-скрипте:** `StrictHostKeyChecking=accept-new` (или эквивалент в используемой SSH-библиотеке Go).
+- Поведение SSH как **accept-new** для known_hosts (аналог `StrictHostKeyChecking=accept-new` в OpenSSH).
 
 ---
 
@@ -192,11 +192,11 @@
 
 ---
 
-## 12. Миграция с Bash-версии
+## 12. Миграция с прежней Bash-версии
 
-- Документировать соответствие полей старых файлов → новый `docker-ops.yaml` + `dq.env`.
-- Команду автоматической миграции **не требуем** (опционально позже).
-- После стабилизации Go: `scripts/docker-ops.sh` — deprecated или удаление отдельным изменением.
+- Соответствие полей старых `docker-ops.remote.*` / переменных окружения → `docker-ops.yaml` + `dq.env` — задокументировать (таблица в roadmap).
+- Автоматической миграции **нет** (при желании — отдельно).
+- Bash/Python-скрипты из репозитория **удалены**; используйте только `dq`.
 
 ---
 
@@ -204,7 +204,7 @@
 
 - Все команды из §5.3 в локальном режиме на Linux с установленным Docker.
 - Удалённый режим без `dq` на сервере: e2e `deploy` (`source` и `artifacts` с save/load) по SSH.
-- Нет Python; нет обязательного `rsync` на клиенте; sync по SFTP + size/mtime.
+- Нет зависимости от Python и обязательного `rsync` на клиенте; sync по SFTP + size/mtime.
 - Конфиг только в корне: `docker-ops.yaml` | `docker-ops.yml`; секреты в `dq.env`; приоритет слияния — **§14.1**.
 - `dq completion bash|zsh` и man согласно §4.6.
 - Локализация: en по умолчанию, ru при русской локали / `DQ_LANG` / `--lang` (**§8**).
@@ -236,7 +236,8 @@
 
 ## Реализация (Go)
 
-- Исходники: `cmd/dq`, `internal/config`, `internal/cli`, `internal/compose`, `internal/sshexec`, `internal/remote`, `internal/version`.
+- Исходники: `cmd/dq`, `internal/config`, `internal/cli`, `internal/compose`, `internal/deploy`, `internal/sshexec`, `internal/remote`, `internal/version`, `tools/genman`.
+- Отдельных Bash/Python-скриптов в репозитории **нет** (раньше — `scripts/`).
 - Сборка: `make build` → `bin/dq`; `make install` — через `go install`.
 - Тесты: `make test` / `make test-unit` (`-race`); `make test-integration` — `-tags=integration` (нужен Docker с плагином **Compose V2**).
 - Подробный статус по пунктам — в **Roadmap** ниже.
@@ -290,7 +291,7 @@
 - [x] **man-страницы**: `dq man`, `make gen-man` / `make install-man` (**§4.6**)
 - [x] **GoReleaser** + CI-матрица OS/arch, архивы, checksums (**§7**, `.goreleaser.yaml`, `.github/workflows/`)
 - [ ] Краткая документация по **WSL2** (**§6**)
-- [ ] Таблица миграции полей старых `docker-ops.remote.*` → новый формат (**§12**); пометить/удалить `scripts/docker-ops.sh` после паритета
+- [ ] Таблица миграции полей старых `docker-ops.remote.*` → `docker-ops.yaml` / `dq.env` (**§12**)
 
 ### Локализация
 
