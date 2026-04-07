@@ -28,7 +28,7 @@ builds:
 
 archives:
   - id: dq
-    builds:
+    ids:
       - dq
     formats:
       - tar.gz
