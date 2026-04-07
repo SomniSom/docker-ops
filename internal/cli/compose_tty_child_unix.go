@@ -9,10 +9,13 @@ import (
 )
 
 // prepareComposeTTYChild configures c before Start so the immediate child becomes the
-// leader of a new process group (Setpgid). That allows signalComposeProcessTree to
-// send sig to the entire tree (docker CLI plus the compose plugin subprocess), which
-// plain Process.Signal(SIGINT) on the parent docker PID may not interrupt reliably
-// during docker compose logs -f.
+// leader of a new process group (Setpgid). signalComposeProcessTree can then signal the
+// whole docker compose tree with Kill(-pid, sig).
+//
+// The parent process (dq) must stay in the TTY foreground process group so keyboard
+// SIGINT is delivered to dq and we can forward (or escalate) to the child. Do not move
+// the foreground group to the child: then dq would not receive Ctrl+C and could not
+// recover if docker ignores SIGINT.
 func prepareComposeTTYChild(c *exec.Cmd) {
 	if c.SysProcAttr == nil {
 		c.SysProcAttr = &syscall.SysProcAttr{}
@@ -20,9 +23,8 @@ func prepareComposeTTYChild(c *exec.Cmd) {
 	c.SysProcAttr.Setpgid = true
 }
 
-// signalComposeProcessTree delivers sig to the process group whose ID equals p.Pid
-// (Kill with a negative PID). No-op if p is nil or Pid is non-positive. Ignores errors
-// from Kill (e.g. process already exited).
+
+// signalComposeProcessTree sends sig to the child's process group (negative PID).
 func signalComposeProcessTree(p *os.Process, sig syscall.Signal) {
 	if p == nil || p.Pid <= 0 {
 		return

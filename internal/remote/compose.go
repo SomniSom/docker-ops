@@ -60,5 +60,8 @@ func RunDockerComposeClient(client *ssh.Client, cfg *config.Config, composeFileO
 		script += " && export DEPLOY_IMAGE=" + sshexec.ShellQuote(di)
 	}
 	script += " && docker " + sshexec.QuoteArgs(inner)
-	return sshexec.RunBashOpts(client, script, tty, sshexec.BashOpts{RawLocalStdin: rawLocalStdin})
+	return sshexec.RunBashOpts(client, script, tty, sshexec.BashOpts{
+		RawLocalStdin:           rawLocalStdin,
+		CloseSessionOnInterrupt: tty && !rawLocalStdin,
+	})
 }

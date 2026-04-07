@@ -315,7 +315,8 @@ func newLogsCmd(projectDir *string, tailOnly bool) *cobra.Command {
 			}
 			var ex *exec.ExitError
 			if errors.As(err, &ex) {
-				if code := ex.ExitCode(); code == 130 || code == 141 {
+				switch code := ex.ExitCode(); code {
+				case 130, 141, 137, 143: // interrupt, pipe, SIGKILL, SIGTERM — expected when stopping logs -f
 					return nil
 				}
 			}

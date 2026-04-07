@@ -60,6 +60,8 @@ Ctrl+C is forwarded to the container (interrupt current line). Ctrl+D (EOF) exit
 
 If stdin is not a terminal (e.g. remote run from an IDE), follow mode uses --tail 200 instead of -f so logs are not empty.
 
+In follow mode from a terminal: Ctrl+C stops streaming — dq kills the local docker compose process tree, or closes the SSH session when using remote compose (SIGINT is not forwarded into docker compose logs). Ctrl+D does not exit log follow.
+
 Optional service names are positional arguments before any flags, e.g.:
   dq logs
   dq logs parser
