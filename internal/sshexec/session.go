@@ -6,6 +6,8 @@ import (
 	"io"
 	"os"
 	"os/signal"
+	"sync"
+	"sync/atomic"
 	"syscall"
 
 	"github.com/SomniSom/docker-ops/internal/locale"
@@ -17,6 +19,10 @@ import (
 type BashOpts struct {
 	// RawLocalStdin puts the client's stdin in raw mode so keys (e.g. Ctrl+D / EOT) reach the remote shell.
 	RawLocalStdin bool
+	// CloseSessionOnInterrupt ends the SSH session on local Ctrl+C / SIGTERM instead of forwarding
+	// ssh.SIGINT to the remote shell. Use for dq logs -f: dropping the session stops log streaming.
+	// Do not set for dq exec -it, where SIGINT must reach the container shell.
+	CloseSessionOnInterrupt bool
 }
 
 // RunBash runs bash -lc script on the SSH connection.
@@ -83,10 +89,19 @@ func RunBashOpts(client *ssh.Client, script string, tty bool, opts BashOpts) err
 	sigCh := make(chan os.Signal, 8)
 	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
 	done := make(chan struct{})
+	var interruptCloseOnce sync.Once
+	var closedSessionForInterrupt atomic.Bool
 	go func() {
 		for {
 			select {
 			case sig := <-sigCh:
+				if opts.CloseSessionOnInterrupt {
+					interruptCloseOnce.Do(func() {
+						closedSessionForInterrupt.Store(true)
+						_ = sess.Close()
+					})
+					continue
+				}
 				switch sig {
 				case os.Interrupt:
 					_ = sess.Signal(ssh.SIGINT)
@@ -101,6 +116,9 @@ func RunBashOpts(client *ssh.Client, script string, tty bool, opts BashOpts) err
 	waitErr := sess.Wait()
 	close(done)
 	signal.Stop(sigCh)
+	if closedSessionForInterrupt.Load() {
+		return nil
+	}
 	if waitErr != nil {
 		return fmt.Errorf("%s: %w", locale.T("ssh.err.remote"), waitErr)
 	}

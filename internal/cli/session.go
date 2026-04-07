@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"sync"
 	"syscall"
 
 	"github.com/SomniSom/docker-ops/internal/compose"
@@ -78,6 +79,16 @@ func (s *composeSession) runLocalComposeTTY(args []string, rawStdin bool) error 
 		return fmt.Errorf("%s: %w", locale.Tf("compose.file_missing", composePath), err)
 	}
 	c := s.local.Command(args...)
+	if !rawStdin {
+		// logs -f: do not give docker the controlling TTY for stdin. Otherwise the CLI often
+		// switches to raw mode and Ctrl+C becomes literal 0x03 (^C echo) instead of SIGINT to dq.
+		dn, err := os.Open(os.DevNull)
+		if err != nil {
+			return fmt.Errorf("%s: %w", locale.T("compose.run_prefix"), err)
+		}
+		defer dn.Close()
+		c.Stdin = dn
+	}
 	prepareComposeTTYChild(c)
 	var stderrBuf bytes.Buffer
 	c.Stderr = io.MultiWriter(os.Stderr, &stderrBuf)
@@ -100,21 +111,37 @@ func (s *composeSession) runLocalComposeTTY(args []string, rawStdin bool) error 
 	}
 
 	if term.IsTerminal(fd) {
-		savedPgrp, fgOK := grantComposeTTYForeground(fd, c.Process.Pid)
-		if fgOK {
-			defer restoreComposeTTYForeground(fd, savedPgrp)
-		}
-
 		sigCh := make(chan os.Signal, 8)
 		signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
 		done := make(chan struct{})
 		go func() {
+			if !rawStdin {
+				// logs -f: stop streaming — do not forward SIGINT to docker; kill the tree so dq exits.
+				for {
+					select {
+					case <-sigCh:
+						signalComposeProcessTree(c.Process, syscall.SIGKILL)
+					case <-done:
+						return
+					}
+				}
+			}
+			var intMu sync.Mutex
+			var sigintCount int
 			for {
 				select {
 				case sig := <-sigCh:
 					switch sig {
 					case os.Interrupt:
-						signalComposeProcessTree(c.Process, syscall.SIGINT)
+						intMu.Lock()
+						sigintCount++
+						n := sigintCount
+						intMu.Unlock()
+						if n >= 2 {
+							signalComposeProcessTree(c.Process, syscall.SIGKILL)
+						} else {
+							signalComposeProcessTree(c.Process, syscall.SIGINT)
+						}
 					case syscall.SIGTERM:
 						signalComposeProcessTree(c.Process, syscall.SIGTERM)
 					}
