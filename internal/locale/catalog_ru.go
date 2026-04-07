@@ -2,7 +2,7 @@ package locale
 
 var catalogRu = map[string]string{
 	"root.short": "Docker Compose локально и по SSH",
-	"root.long":  "%s (%s) — управление проектами Docker Compose. Полная спецификация — в readme.md.",
+	"root.long":  "%s (%s) — управление проектами Docker Compose. Полная спецификация — в readme.ru.md.",
 
 	"flag.lang":         "Язык интерфейса: en, ru или auto (по LANG / LC_MESSAGES / DQ_LANG)",
 	"flag.project_root": "корень проекта (по умолчанию: $DQ_PROJECT_ROOT или текущий каталог)",

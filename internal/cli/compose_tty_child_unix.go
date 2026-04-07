@@ -23,6 +23,7 @@ func prepareComposeTTYChild(c *exec.Cmd) {
 	c.SysProcAttr.Setpgid = true
 }
 
+
 // signalComposeProcessTree sends sig to the child's process group (negative PID).
 func signalComposeProcessTree(p *os.Process, sig syscall.Signal) {
 	if p == nil || p.Pid <= 0 {

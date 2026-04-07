@@ -13,8 +13,11 @@ import (
 	"golang.org/x/term"
 )
 
-// logsComposeExtras returns flags after "logs" and whether to use an interactive TTY session (for Ctrl+C on follow).
-// When stdin is not a terminal, docker compose logs -f exits immediately with little or no output; use --tail instead.
+// logsComposeExtras decides docker compose logs flags and whether the caller should use
+// RunTTY instead of Run. For logs-tail (tailOnly true) it always returns --tail 200 and
+// useRunTTY false. For streaming logs, if stdin is a terminal it returns -f and useRunTTY
+// true so SIGINT can be forwarded; otherwise it uses --tail 200 because logs -f with a
+// non-TTY stdin often exits immediately with no useful output.
 func logsComposeExtras(tailOnly, stdinIsTerminal bool) (extra []string, useRunTTY bool) {
 	if tailOnly {
 		return []string{"--tail", "200"}, false
@@ -25,7 +28,10 @@ func logsComposeExtras(tailOnly, stdinIsTerminal bool) (extra []string, useRunTT
 	return []string{"--tail", "200"}, false
 }
 
-// splitLeadingServiceArgs treats initial args without a leading '-' as compose service names; the rest are passed to docker compose (flags, etc.).
+// splitLeadingServiceArgs splits argv for dq logs / status: consecutive arguments that
+// do not start with '-' are treated as compose service names; the remainder (typically
+// docker compose flags like --tail) is returned as rest and appended after services
+// when building the docker compose argv.
 func splitLeadingServiceArgs(args []string) (services, rest []string) {
 	i := 0
 	for i < len(args) && !strings.HasPrefix(args[i], "-") {
@@ -35,6 +41,8 @@ func splitLeadingServiceArgs(args []string) (services, rest []string) {
 	return services, args[i:]
 }
 
+// newComposeCmds returns the compose-related subcommands bound to projectDir (pointer
+// to the root persistent flag value).
 func newComposeCmds(projectDir *string) []*cobra.Command {
 	return []*cobra.Command{
 		newBuildCmd(projectDir),
@@ -51,6 +59,7 @@ func newComposeCmds(projectDir *string) []*cobra.Command {
 	}
 }
 
+// newBuildCmd creates "build": docker compose build --pull plus extra args.
 func newBuildCmd(projectDir *string) *cobra.Command {
 	return &cobra.Command{
 		Use:   "build",
@@ -65,6 +74,7 @@ func newBuildCmd(projectDir *string) *cobra.Command {
 	}
 }
 
+// newPullCmd creates "pull": docker compose pull plus extra args.
 func newPullCmd(projectDir *string) *cobra.Command {
 	return &cobra.Command{
 		Use:   "pull",
@@ -79,6 +89,7 @@ func newPullCmd(projectDir *string) *cobra.Command {
 	}
 }
 
+// newUpCmd creates "up": checks app_config exists if set, docker compose up -d, then ps.
 func newUpCmd(projectDir *string) *cobra.Command {
 	return &cobra.Command{
 		Use:   "up",
@@ -100,6 +111,7 @@ func newUpCmd(projectDir *string) *cobra.Command {
 	}
 }
 
+// newDownCmd creates "down": docker compose down plus extra args.
 func newDownCmd(projectDir *string) *cobra.Command {
 	return &cobra.Command{
 		Use:   "down",
@@ -114,6 +126,7 @@ func newDownCmd(projectDir *string) *cobra.Command {
 	}
 }
 
+// newReupCmd creates "reup": build --pull, up -d, then ps (with app_config check like up).
 func newReupCmd(projectDir *string) *cobra.Command {
 	return &cobra.Command{
 		Use:   "reup",
@@ -138,6 +151,7 @@ func newReupCmd(projectDir *string) *cobra.Command {
 	}
 }
 
+// newPsCmd creates "ps": docker compose ps plus extra args.
 func newPsCmd(projectDir *string) *cobra.Command {
 	return &cobra.Command{
 		Use:   "ps",
@@ -152,6 +166,8 @@ func newPsCmd(projectDir *string) *cobra.Command {
 	}
 }
 
+// newRestartCmd creates "restart": service from first arg or compose_service in config,
+// then docker compose ps.
 func newRestartCmd(projectDir *string) *cobra.Command {
 	return &cobra.Command{
 		Use:   "restart",
@@ -179,6 +195,8 @@ func newRestartCmd(projectDir *string) *cobra.Command {
 	}
 }
 
+// newExecCmd creates "exec": uses RunExecTTY with -it when stdin is a TTY and -T not set;
+// otherwise compose exec -T.
 func newExecCmd(projectDir *string) *cobra.Command {
 	var noTTY bool
 	c := &cobra.Command{
@@ -208,6 +226,8 @@ func newExecCmd(projectDir *string) *cobra.Command {
 	return c
 }
 
+// newStatusCmd creates "status": prints ps -a then a fixed --tail 80 logs slice for
+// optional service names (splitLeadingServiceArgs).
 func newStatusCmd(projectDir *string) *cobra.Command {
 	return &cobra.Command{
 		Use:   "status [service...]",
@@ -238,6 +258,9 @@ func newStatusCmd(projectDir *string) *cobra.Command {
 	}
 }
 
+// newLogsCmd creates "logs" (tailOnly false) or "logs-tail" (tailOnly true). Follow mode
+// uses RunTTY when stdin is a terminal; treats user interrupt exit codes 130/141 as success
+// for local exec and SSH.
 func newLogsCmd(projectDir *string, tailOnly bool) *cobra.Command {
 	use := locale.T("logs.use.follow")
 	short := locale.T("logs.short.follow")
