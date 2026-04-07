@@ -12,7 +12,7 @@ _dq_completion() {
 		cword=$COMP_CWORD
 	fi
 
-	local cmds="version validate env config-check build pull up down reup ps restart exec status logs logs-tail deploy gen-image-compose completion man help"
+	local cmds="version validate env config-check build pull up down stop reup ps restart exec status logs logs-tail deploy gen-image-compose completion man help"
 
 	if [[ "$cword" -eq 1 ]]; then
 		mapfile -t COMPREPLY < <(compgen -W "$cmds" -- "$cur")

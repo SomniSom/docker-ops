@@ -49,6 +49,7 @@ func newComposeCmds(projectDir *string) []*cobra.Command {
 		newPullCmd(projectDir),
 		newUpCmd(projectDir),
 		newDownCmd(projectDir),
+		newStopCmd(projectDir),
 		newReupCmd(projectDir),
 		newPsCmd(projectDir),
 		newRestartCmd(projectDir),
@@ -122,6 +123,24 @@ func newDownCmd(projectDir *string) *cobra.Command {
 				return err
 			}
 			return s.Run(append([]string{"down"}, args...)...)
+		},
+	}
+}
+
+// newStopCmd creates "stop": docker compose stop (containers stay, unlike down), then ps.
+func newStopCmd(projectDir *string) *cobra.Command {
+	return &cobra.Command{
+		Use:   "stop [service...]",
+		Short: locale.T("stop.short"),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			s, err := newComposeSession(projectDir)
+			if err != nil {
+				return err
+			}
+			if err := s.Run(append([]string{"stop"}, args...)...); err != nil {
+				return err
+			}
+			return s.Run("ps")
 		},
 	}
 }

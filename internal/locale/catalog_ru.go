@@ -33,6 +33,7 @@ Artifacts: нужны docker-compose.image.yml и deploy_image; опционал
 	"pull.short":    "docker compose pull",
 	"up.short":      "docker compose up -d",
 	"down.short":    "docker compose down",
+	"stop.short":    "docker compose stop (контейнеры остаются; опционально имена сервисов)",
 	"reup.short":    "docker compose build --pull && up -d",
 	"ps.short":      "docker compose ps",
 	"restart.short": "docker compose restart <сервис>",

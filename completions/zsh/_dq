@@ -11,6 +11,7 @@ _dq_cmds=(
 	'pull:docker compose pull'
 	'up:docker compose up -d'
 	'down:docker compose down'
+	'stop:docker compose stop'
 	'reup:build и up'
 	'ps:docker compose ps'
 	'restart:перезапуск сервиса'

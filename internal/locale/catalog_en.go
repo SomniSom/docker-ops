@@ -34,6 +34,7 @@ Artifacts: requires docker-compose.image.yml and deploy_image; optional docker b
 	"pull.short":    "docker compose pull",
 	"up.short":      "docker compose up -d",
 	"down.short":    "docker compose down",
+	"stop.short":    "docker compose stop (containers kept; optional service names)",
 	"reup.short":    "docker compose build --pull && up -d",
 	"ps.short":      "docker compose ps",
 	"restart.short": "docker compose restart <service>",
