@@ -9,6 +9,7 @@ import (
 	"github.com/SomniSom/docker-ops/internal/version"
 )
 
+// newVersionCmd creates "version", printing binary name, semver, and commit hash.
 func newVersionCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "version",

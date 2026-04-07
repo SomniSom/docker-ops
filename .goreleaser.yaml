@@ -45,6 +45,7 @@ archives:
     files:
       - LICENSE
       - readme.md
+      - readme.ru.md
 
 checksum:
   name_template: "{{ .ProjectName }}_{{ .Version }}_checksums.txt"

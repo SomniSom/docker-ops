@@ -1,3 +1,7 @@
+// Package cli constructs the dq Cobra command tree: compose helpers, deploy, validation,
+// shell completion, and man-page generation. Subcommands resolve the project root from
+// docker-ops.yml (and optional --project-dir), then run docker compose either locally
+// or over SSH when remote_ssh / remote_path are set in config.
 package cli
 
 import (
@@ -10,7 +14,10 @@ import (
 	"github.com/SomniSom/docker-ops/internal/version"
 )
 
-// NewRoot builds the dq command tree.
+// NewRoot returns the root *cobra.Command for the dq binary. It registers all
+// subcommands (version, validate, env, compose, deploy, completion, man, etc.),
+// wires persistent flags (--project-dir, --lang), and applies SilenceErrors /
+// SilenceUsage so RunE failures are printed once from main without dumping full usage.
 func NewRoot() *cobra.Command {
 	var projectDir string
 
@@ -48,6 +55,9 @@ func NewRoot() *cobra.Command {
 	return root
 }
 
+// loadCfg resolves the project directory from projectDir (empty means search upward
+// for docker-ops.yml), loads config and returns the parsed *config.Config together
+// with the absolute project root path.
 func loadCfg(projectDir *string) (*config.Config, string, error) {
 	root, err := config.ResolveProjectRoot(*projectDir)
 	if err != nil {

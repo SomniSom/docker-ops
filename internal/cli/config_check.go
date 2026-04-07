@@ -9,6 +9,8 @@ import (
 	"github.com/SomniSom/docker-ops/internal/locale"
 )
 
+// newConfigCheckCmd creates "config-check": verifies app_config from docker-ops.yml
+// points at an existing file under the project root.
 func newConfigCheckCmd(projectDir *string) *cobra.Command {
 	return &cobra.Command{
 		Use:   "config-check",
