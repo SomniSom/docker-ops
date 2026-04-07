@@ -78,6 +78,7 @@ func (s *composeSession) runLocalComposeTTY(args []string, rawStdin bool) error 
 		return fmt.Errorf("%s: %w", locale.Tf("compose.file_missing", composePath), err)
 	}
 	c := s.local.Command(args...)
+	prepareComposeTTYChild(c)
 	var stderrBuf bytes.Buffer
 	c.Stderr = io.MultiWriter(os.Stderr, &stderrBuf)
 
@@ -99,6 +100,11 @@ func (s *composeSession) runLocalComposeTTY(args []string, rawStdin bool) error 
 	}
 
 	if term.IsTerminal(fd) {
+		savedPgrp, fgOK := grantComposeTTYForeground(fd, c.Process.Pid)
+		if fgOK {
+			defer restoreComposeTTYForeground(fd, savedPgrp)
+		}
+
 		sigCh := make(chan os.Signal, 8)
 		signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
 		done := make(chan struct{})
@@ -106,13 +112,11 @@ func (s *composeSession) runLocalComposeTTY(args []string, rawStdin bool) error 
 			for {
 				select {
 				case sig := <-sigCh:
-					if c.Process != nil {
-						switch sig {
-						case os.Interrupt:
-							_ = c.Process.Signal(syscall.SIGINT)
-						case syscall.SIGTERM:
-							_ = c.Process.Signal(syscall.SIGTERM)
-						}
+					switch sig {
+					case os.Interrupt:
+						signalComposeProcessTree(c.Process, syscall.SIGINT)
+					case syscall.SIGTERM:
+						signalComposeProcessTree(c.Process, syscall.SIGTERM)
 					}
 				case <-done:
 					return
