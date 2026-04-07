@@ -1,0 +1,11 @@
+/bin/
+/dist/
+.cursor/
+*.exe
+*.test
+coverage.out
+coverage.html
+dq.env
+.docker-ops-*
+.idea/
+.vscode/

@@ -1,0 +1,26 @@
+# Пример для ручного копирования в docker-ops.yaml (или docker-ops.yml) в корне проекта.
+# Секреты и переопределения — в dq.env (в .gitignore, не коммитить).
+# Шаблон из dq:  dq env   или   dq env --help
+#
+# Ключи в YAML — snake_case; те же имена в dq.env часто в UPPER_CASE (см. examples и readme §14.1).
+
+remote_ssh: user@server
+remote_path: /opt/myapp
+
+# Опционально:
+# ssh_identity: ~/.ssh/id_ed25519
+# rsync_extra: --dry-run
+# compose_project_name: myapp
+# compose_file: docker-compose.yml
+# compose_service: app
+
+# --- Режим artifacts (только образ + compose, см. readme §5.3) ---
+# deploy_mode: artifacts
+# compose_file: docker-compose.image.yml
+# deploy_image: ghcr.io/you/myapp:1.0.0
+# deploy_push: true
+
+# Дополнительные пути относительно корня проекта (deploy source и artifacts):
+# deploy_include:
+#   - assets
+#   - static/logo.png
