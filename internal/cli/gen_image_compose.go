@@ -12,6 +12,8 @@ import (
 	"github.com/SomniSom/docker-ops/internal/locale"
 )
 
+// newGenImageComposeCmd creates "gen-image-compose": emits a compose override with a
+// pinned image reference for deploy workflows (see composeimage package and flags).
 func newGenImageComposeCmd(projectDir *string) *cobra.Command {
 	var (
 		outPath   string

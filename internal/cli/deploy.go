@@ -9,6 +9,8 @@ import (
 	"github.com/SomniSom/docker-ops/internal/locale"
 )
 
+// newDeployCmd creates "deploy": requires remote_ssh/remote_path in config, then runs
+// deploy.RunWithOptions (optional --build for image artifacts).
 func newDeployCmd(projectDir *string) *cobra.Command {
 	var build bool
 	c := &cobra.Command{

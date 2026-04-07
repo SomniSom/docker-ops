@@ -13,6 +13,8 @@ import (
 	"github.com/SomniSom/docker-ops/internal/version"
 )
 
+// newManCmd creates "man": renders a roff man page for the resolved subcommand (or root)
+// via cobra/doc and pipes it to man -l on Unix.
 func newManCmd(root *cobra.Command) *cobra.Command {
 	return &cobra.Command{
 		Use:   "man [command]...",

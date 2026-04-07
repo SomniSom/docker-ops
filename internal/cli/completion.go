@@ -8,6 +8,8 @@ import (
 	"github.com/SomniSom/docker-ops/internal/locale"
 )
 
+// newCompletionCmd creates "completion" for bash, zsh, fish, or powershell using
+// Cobra built-in generators and the provided root command tree.
 func newCompletionCmd(root *cobra.Command) *cobra.Command {
 	return &cobra.Command{
 		Use:   "completion [bash|zsh|fish|powershell]",

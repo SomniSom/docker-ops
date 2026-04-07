@@ -1,307 +1,303 @@
-# Техническое задание: **dq** — Docker Quick-ops
+# Technical specification: **dq** — Docker Quick-ops
 
-**Статус:** реализация на Go (черновик ТЗ в этом файле).  
-**Исполняемый CLI:** бинарник **`dq`** в репозитории; Bash/Python-обвязка удалена.
+**Language:** English · [Русский](readme.ru.md)
 
-**Полное название продукта:** **Docker Quick-ops** (бинарник: `dq`).
+**Status:** Go implementation (draft specification in this file).  
+**CLI binary:** the **`dq`** executable in this repository; the Bash/Python wrapper has been removed.
 
----
-
-## 1. Обоснование и цели
-
-### 1.1 Проблема (исторически)
-
-- Прежний стек на **Bash**, **rsync/ssh/scp** и **Python** для YAML давал расхождения между окружениями.
-
-### 1.2 Цель
-
-**Один статически собираемый бинарник `dq`**, который:
-
-- конфигурацией в `**docker-ops.yaml**` или `**docker-ops.yml**` только в **корне проекта** (без альтернативных путей вроде `scripts/`);
-- секретами и чувствительными значениями в отдельном `**dq.env`** (в `**.gitignore`**), подмешиваемом к настройкам;
-- CLI на **spf13/cobra**;
-- генерацией **автодополнений** (bash/zsh/fish при необходимости) и **man-страниц** из метаданных Cobra (или связанных инструментов);
-- передачей файлов по **SSH из Go** (без обязательного `rsync`/`scp` на машине пользователя);
-- **кросс-компиляцией** под основные ОС и архитектуры (linux/windows/darwin, amd64/arm64 и т.д.).
-
-### 1.3 Нефункциональные ожидания
-
-- **Самодостаточность рантайма**: без Python и без обязательного `rsync` на клиенте.
-- Предсказуемое поведение и понятные сообщения об ошибках.
-- Версионируемые релизы (теги, changelog — по решению).
+**Full product name:** **Docker Quick-ops** (binary: `dq`).
 
 ---
 
-## 2. Термины
+## 1. Rationale and goals
 
+### 1.1 Problem (historically)
 
-| Термин                       | Значение                                                                                                                               |
-| ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| **Корень проекта**           | Каталог, с которого пользователь запускает `dq` (текущий `cwd`).                                                                       |
-| **Локальный режим**          | Нет настроенного удалённого хоста или принудительно отключён (`--local` / флаг в конфиге / переменная окружения).                      |
-| **Удалённый режим**          | Заданы хост и путь на сервере; команды выполняются **по SSH** на удалённой машине (без установки `dq` на сервер).                      |
-| **Режим деплоя `source`**    | Синхронизация дерева проекта на сервер + удалённый `reup` (сборка на сервере).                                                         |
-| **Режим деплоя `artifacts`** | На сервер — compose «только образ», при необходимости файл конфигурации приложения (если задан), образ через registry или `save/load`. |
+- The previous stack based on **Bash**, **rsync/ssh/scp**, and **Python** for YAML led to drift between environments.
 
+### 1.2 Goal
+
+**A single statically linkable `dq` binary** that:
+
+- reads configuration from `**docker-ops.yaml**` or `**docker-ops.yml**` only at the **project root** (no alternate paths such as `scripts/`);
+- keeps secrets and sensitive values in a separate `**dq.env**` file (listed in `**.gitignore**`), merged into settings;
+- exposes a CLI built with **spf13/cobra**;
+- generates **shell completions** (bash/zsh/fish as needed) and **man pages** from Cobra metadata (or related tooling);
+- transfers files over **SSH from Go** without requiring `rsync`/`scp` on the user machine;
+- supports **cross-compilation** for major OS/arch combinations (linux/windows/darwin, amd64/arm64, etc.).
+
+### 1.3 Non-functional expectations
+
+- **Runtime self-sufficiency:** no Python and no mandatory `rsync` on the client.
+- Predictable behaviour and clear error messages.
+- Versioned releases (tags, changelog — as decided).
 
 ---
 
-## 3. Имя и брендинг
+## 2. Terminology
 
-- **Полное название:** Docker Quick-ops.
-- **Исполняемый файл:** `dq`.
-- В `dq version`, man-странице `NAME` и документации использовать формулировку **Docker Quick-ops** (`dq`).
+| Term | Meaning |
+| --- | --- |
+| **Project root** | Directory from which the user runs `dq` (current `cwd`). |
+| **Local mode** | No remote host configured, or remote explicitly disabled (`--local` / config flag / environment variable). |
+| **Remote mode** | Host and server path are set; commands run **over SSH** on the remote machine (`dq` is **not** installed on the server). |
+| **`source` deploy mode** | Sync project tree to the server + remote `reup` (build on server). |
+| **`artifacts` deploy mode** | Server receives image-only compose, optional app config if set, image via registry or `save/load`. |
 
 ---
 
-## 4. Архитектура решения
+## 3. Naming and branding
 
-### 4.1 Язык и модули
+- **Full name:** Docker Quick-ops.
+- **Executable:** `dq`.
+- Use **Docker Quick-ops** (`dq`) in `dq version`, man `NAME`, and documentation.
 
-- **Go** (версия — зафиксировать в go.mod, LTS-ветка).
-- **Cobra** — корневая команда `dq`, подкоманды вместо «первый аргумент = команда».
-- Пакеты условно: `config`, `compose` (CLI и при необходимости API), `remote/ssh`, `sync` (зеркалирование дерева), `deploy`, `internal/version`.
+---
 
-### 4.2 Конфигурация
+## 4. Solution architecture
 
-- **Основной файл:** только `./docker-ops.yaml` или `./docker-ops.yml` в **корне проекта** (относительно cwd). Других стандартных путей (в т.ч. `scripts/`) **нет**.
-- **Секреты:** отдельный файл `**dq.env`** в корне проекта (формат dotenv / shell-assignments), **обязательно** в `.gitignore`; значения из него подмешиваются к конфигурации (приоритет над полями YAML — зафиксировать в реализации, обычно env выше).
-- Валидация при старте; понятные ошибки при отсутствии обязательных полей для выбранной команды.
+### 4.1 Language and modules
 
-### 4.3 SSH и копирование файлов
+- **Go** (version pinned in go.mod, LTS branch).
+- **Cobra** — root command `dq`, subcommands instead of “first argv = command”.
+- Packages (roughly): `config`, `compose` (CLI and API if needed), `remote/ssh`, tree mirroring, `deploy`, `internal/version`.
 
-- Аутентификация по ключу (путь из конфига / ssh-agent / дефолты OpenSSH).
-- **Синхронизация каталога** без бинарника `rsync` на клиенте: на старте **SFTP + сравнение по размеру и mtime**; лимиты размера репозитория **не вводим** (при необходимости позже).
-- **Поток образа** `docker save | … | docker load`: через SSH с передачей stdin или временный файл на сервере — по реализации с учётом диска и безопасности.
+### 4.2 Configuration
 
-### 4.4 Взаимодействие с Docker
+- **Main file:** only `./docker-ops.yaml` or `./docker-ops.yml` at the **project root** (relative to cwd). No other standard paths (including `scripts/`).
+- **Secrets:** separate `**dq.env**` at project root (dotenv / shell-assignments), **must** be in `.gitignore`; values merge into config (precedence vs YAML fields — defined in code; env file usually wins).
+- Validation on startup; clear errors when required fields for a command are missing.
 
-- **Сейчас:** только **`docker compose`** (плагин **Compose V2** для Docker CLI). Отдельный бинарь **`docker-compose` (V1) не поддерживается** — при отсутствии плагина `dq` выводит подсказку по установке (см. документацию Docker). Локально и **на удалённой машине через SSH** (команды выполняет shell на сервере, `dq` на сервер **не устанавливается**).
-- **Расширенные функции:** допускается работа через `**docker.sock`** (локальный API Docker).
-- **Планы:** интеграция с **HTTP API Docker** (в т.ч. для **удалённого** хоста). Доступ к API на сервере — через **SSH к сокету Docker** (`/var/run/docker.sock` на удалённой машине): проброс/туннель в рамках SSH-сессии (локальный Unix-socket или TCP-прокси на стороне клиента), без требования открывать Docker API в сеть. Детали транспорта — в реализации (см. **§14.2**).
+### 4.3 SSH and file copy
 
-### 4.5 Удалённое выполнение (без `dq` на сервере)
+- Key-based auth (path from config / ssh-agent / OpenSSH defaults).
+- **Directory sync** without `rsync` on the client: **SFTP + size/mtime comparison**; no repo size cap for now (may add later).
+- **Image stream** `docker save | … | docker load`: over SSH via stdin or temp file on server — implementation-specific (disk and safety).
 
-- Все подкоманды вроде `up`, `logs`, `deploy` в удалённом режиме реализуются как **одна SSH-сессия / удалённый shell** с выполнением `**docker compose …`** в `remote_path`.
-- В режиме `**artifacts`** на сервер передаются **файлы деплоя** (compose image, опционально конфиг приложения и т.д.), **не** бинарник `dq`.
+### 4.4 Docker interaction
 
-### 4.6 Cobra: shell completion и man
+- **Current:** only **`docker compose`** (**Compose V2** plugin for Docker CLI). Standalone **`docker-compose` (V1) is not supported** — if the plugin is missing, `dq` prints install hints (see Docker docs). Same locally and **on the remote host over SSH** (remote shell runs commands; **`dq` is not installed on the server**).
+- **Extensions:** may use `**docker.sock**` (local Docker API).
+- **Planned:** **HTTP Docker API** (including **remote** hosts). Access on the server via **SSH to the Docker socket** (`/var/run/docker.sock` on the remote host): forward/tunnel in the SSH session (local Unix socket or TCP proxy on the client), without exposing the Docker API on the network. Transport details — in implementation (see **§14.2**).
+
+### 4.5 Remote execution (no `dq` on server)
+
+- Subcommands such as `up`, `logs`, `deploy` in remote mode use **one SSH session / remote shell** running `**docker compose …**` in `remote_path`.
+- In **`artifacts`** mode, **deploy files** are delivered (image compose, optional app config, etc.), **not** the `dq` binary.
+
+### 4.6 Cobra: shell completion and man
 
 - `dq completion bash|zsh|fish|powershell`.
-- **`dq man [подкоманда…]`** — man-страница из метаданных Cobra, просмотр через **`man -l`** (нужны **man-db** / **groff**). Без `man` в `PATH` в stdout выводится исходник troff.
-- Статическая генерация в каталог **`man/man1/`**: **`make gen-man`** (`go run ./tools/genman`); установка: **`make install-man`** (`MANPREFIX`, по умолчанию `/usr/local/share/man`).
-- Один источник правды: Cobra → `--help`, completion и man.
+- **`dq man [subcommand…]`** — man page from Cobra metadata, viewed with **`man -l`** (**man-db** / **groff**). If `man` is not in `PATH`, troff source goes to stdout.
+- Static generation into **`man/man1/`**: **`make gen-man`** (`go run ./tools/genman`); install: **`make install-man`** (`MANPREFIX`, default `/usr/local/share/man`).
+- Single source of truth: Cobra → `--help`, completion, and man.
 
 ---
 
-## 5. Функциональные требования
+## 5. Functional requirements
 
-### 5.1 Общее поведение
+### 5.1 General behaviour
 
-- Корень проекта: **текущий рабочий каталог**; опционально флаг `--project-dir` / переменная `**DQ_PROJECT_ROOT`**.
-- Загрузка `docker-ops.yaml` | `docker-ops.yml` + при наличии `dq.env`.
-- Приоритет настроек: **§14.1**.
+- Project root: **current working directory**; optional `--project-dir` / `**DQ_PROJECT_ROOT**`.
+- Load `docker-ops.yaml` | `docker-ops.yml` + `dq.env` when present.
+- Setting precedence: **§14.1**.
 
-### 5.2 Поля конфигурации
+### 5.2 Configuration fields
 
-Минимальный набор (snake_case в YAML):
+Minimal set (snake_case in YAML):
 
+| Area | Fields |
+| --- | --- |
+| Compose | `compose_project_name`, `compose_file`, `compose_service` |
+| Remote | `remote_ssh`, `remote_path`, `ssh_identity` |
+| Sync | `exclude` list (global); options equivalent to legacy `rsync_extra` map to internal sync |
+| Deploy | `deploy_mode` (`source` or `artifacts`), `deploy_image`, `deploy_push`, `deploy_use_registry`, `deploy_save_load`, `deploy_save_compress` |
+| Extra paths | `deploy_include` — relative to project root |
+| Application | `**app_config**` (or equivalent): **optional** path to app config for copying in `artifacts` and for `config-check`; if unset — **check/copy not required** (often no file exists) |
+| UX | `help_show_effective` and others as needed |
 
-| Область    | Поля                                                                                                                                                                                                                                    |
-| ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Compose    | `compose_project_name`, `compose_file`, `compose_service`                                                                                                                                                                               |
-| Remote     | `remote_ssh`, `remote_path`, `ssh_identity`                                                                                                                                                                                             |
-| Sync       | список `exclude` (глобальный); опции, эквивалентные нынешнему `rsync_extra`, — маппинг на внутренний sync                                                                                                                               |
-| Deploy     | `deploy_mode` (`source` или `artifacts`), `deploy_image`, `deploy_push`, `deploy_use_registry`, `deploy_save_load`, `deploy_save_compress`                                                                                              |
-| Доп. пути  | `deploy_include` — относительно корня проекта                                                                                                                                                                                           |
-| Приложение | `**app_config`** (или аналог): **опциональный** путь к файлу конфигурации приложения для копирования в `artifacts` и для `config-check`; если не задан — **проверка/копирование не обязательны** (в частых случаях файла может не быть) |
-| UX         | `help_show_effective` и др. по необходимости                                                                                                                                                                                            |
+### 5.3 CLI commands
 
+| Command | Locally | Remotely |
+| --- | --- | --- |
+| `help` / `--help` | yes | yes |
+| `man` | man from Cobra (`man -l`) | yes |
+| `env` (config template) | local only | do not proxy |
+| `config-check` | if `app_config` set — verify file; else no-op or info | same over SSH |
+| `build`, `pull`, `up`, `down`, `reup`, `ps`, `restart` | `docker compose …` | SSH + `docker compose …` in `remote_path` |
+| `status` | ps + log tail | same over SSH |
+| `logs`, `logs-tail`, `exec` | follow / tail / `exec -it` in terminal | SSH; PTY for follow and interactive `exec` |
+| `deploy` | SFTP sync + local `docker` for `artifacts`; needs configured remote | `source` or `artifacts` |
 
-### 5.3 Команды CLI
+**`deploy`:**
 
+- **`source`:** directory on server, tree sync with exclude, copy **app_config** when configured and file exists, then remote `reup`.
+- **`artifacts`:** optional local `docker build` (`deploy_push: true` in config or **`dq deploy --build`** without requiring `deploy_push`); registry vs save/load; deliver `docker-compose.image.yml`, **app_config** if set, `deploy_include`; on server over SSH: `config-check` (if applicable) → `up` or `pull`+`up`. **The `dq` binary is not copied to the server.** Draft `docker-compose.image.yml` from base compose: **`dq gen-image-compose`** (one service with `build:`, others `image:` only).
+- **Data on server (`artifacts`):** the whole `remote_path` tree is **not** mirrored — arbitrary files and dirs (e.g. **`db-data`** for PostgreSQL) are **not** deleted unless you list them in **`deploy_include`** and overwrite from local. Ensure **`docker-compose.image.yml`** uses the same volume/path for DB data (`./db-data:/var/lib/postgresql/data`, etc.); plain **`docker compose up`** does not wipe a host bind-mount dir. **`source`** behaves differently (sync may delete extras on server) — riskier for a live DB inside the project tree.
 
-| Команда                                                | Локально                                                                           | Удалённо                                 |
-| ------------------------------------------------------ | ---------------------------------------------------------------------------------- | ---------------------------------------- |
-| `help` / `--help`                                      | да                                                                                 | да                                       |
-| `man`                                                  | man-страницы из Cobra (`man -l`)                                                   | да                                       |
-| `env` (шаблон конфига)                                 | только локально                                                                    | не проксировать                          |
-| `config-check`                                         | если задан `app_config` — проверка файла; иначе no-op или информационное сообщение | то же по SSH                             |
-| `build`, `pull`, `up`, `down`, `reup`, `ps`, `restart` | `docker compose …`                                                                 | SSH + `docker compose …` в `remote_path` |
-| `status`                                               | ps + хвост логов                                                                   | то же по SSH                             |
-| `logs`, `logs-tail`, `exec`                            | follow / tail / `exec -it` в терминале                                            | SSH; PTY для follow и интерактивного `exec` |
-| `deploy`                                               | SFTP sync + локальный `docker` при `artifacts`; требуется настроенный remote      | `source` или `artifacts`                 |
+### 5.4 `env` command (template)
 
-
-`**deploy`:**
-
-- `**source`:** каталог на сервере, sync дерева с exclude, копирование **app_config** при настройке и наличии файла, затем удалённый `reup`.
-- `**artifacts`:** опционально локальный `docker build` (`deploy_push: true` в конфиге или **`dq deploy --build`** без обязательного `deploy_push`); registry vs save/load; доставка `docker-compose.image.yml`, **app_config** если задан, `deploy_include`; на сервере по SSH: `config-check` (если применимо) → `up` или `pull`+`up`. **Бинарник `dq` на сервер не копируется.** Черновик `docker-compose.image.yml` из обычного compose: **`dq gen-image-compose`** (один сервис с `build:`, остальные только `image:`).
-- **Данные на сервере (`artifacts`):** зеркалирования всего каталога `remote_path` **нет** — не удаляются произвольные файлы и папки (в т.ч. **`db-data`** с PostgreSQL), пока вы сами не перечислите их в **`deploy_include`** и не перезапишете с локальной машины. Убедитесь, что в **`docker-compose.image.yml`** том/путь к данным БД тот же (`./db-data:/var/lib/postgresql/data` и т.п.); обычный **`docker compose up`** не стирает bind-mount каталог на хосте. Режим **`source`** ведёт себя иначе (sync с удалением «лишнего» на сервере) — для живой БД в дереве проекта он опаснее.
-
-### 5.4 Команда `env` (шаблон)
-
-- Вывод шаблона `docker-ops.yaml` в stdout или `--output` с `--force`.
-- `--anonymize`: не подставлять реальные `remote_ssh` / `remote_path` из конфига/окружения.
+- Print `docker-ops.yaml` template to stdout or `--output` with `--force`.
+- `--anonymize`: do not substitute real `remote_ssh` / `remote_path` from config/env.
 
 ---
 
-## 6. Платформы
+## 6. Platforms
 
-- **Linux** — основная цель.
-- **Windows на старте:** достаточно сценария **WSL2** (полноценная нативная Windows не требуется в v1).
+- **Linux** — primary target.
+- **Windows initially:** **WSL2** is enough (full native Windows not required in v1).
 
 ---
 
-## 7. Сборка и поставка
+## 7. Build and distribution
 
-- Модуль Go: **`github.com/SomniSom/docker-ops`** (репозиторий: https://github.com/SomniSom/docker-ops). Установка из исходников: `go install github.com/SomniSom/docker-ops/cmd/dq@latest`.
-- `go build -o dq` / `make build` — см. **Makefile** (`VERSION`, `GIT_COMMIT`, ldflags → `internal/version`).
-- **Матрица OS/arch:** в **GitHub Actions** (`.github/workflows/ci.yml`) — тесты на Linux / macOS / Windows и кросс-сборка `linux|darwin|windows` × `amd64|arm64`.
-- **GoReleaser** (`.goreleaser.yaml`): те же целевые платформы, архивы (`tar.gz` / `zip` для Windows), **`checksums.txt`**. Локально: `make goreleaser-check`, снимок без релиза: `make goreleaser-snapshot` (нужен установленный [goreleaser](https://goreleaser.com/install/)). Релиз на GitHub: тег **`v*`** → workflow **`.github/workflows/release.yml`**.
+- Go module: **`github.com/SomniSom/docker-ops`** (repo: https://github.com/SomniSom/docker-ops). Install from source: `go install github.com/SomniSom/docker-ops/cmd/dq@latest`.
+- `go build -o dq` / `make build` — see **Makefile** (`VERSION`, `GIT_COMMIT`, ldflags → `internal/version`).
+- **OS/arch matrix:** **GitHub Actions** (`.github/workflows/ci.yml`) — tests on Linux / macOS / Windows and cross-build `linux|darwin|windows` × `amd64|arm64`.
+- **GoReleaser** (`.goreleaser.yaml`): same targets, archives (`tar.gz` / `zip` on Windows), **`checksums.txt`**. Locally: `make goreleaser-check`, snapshot without release: `make goreleaser-snapshot` ([goreleaser](https://goreleaser.com/install/) required). GitHub release: tag **`v*`** → **`.github/workflows/release.yml`**.
 - `dq version` (git tag + commit).
 - man — `make gen-man` / `make install-man` (**§4.6**).
 
 ---
 
-## 8. Локализация
+## 8. Localization
 
-- Язык интерфейса (сообщения, help подкоманд, тексты ошибок): **английский по умолчанию**.
-- Если в системе выбран **русский** (`LANGUAGE`, `LC_ALL`, `LC_MESSAGES`, `LANG` — префикс `ru`) — используется **русский** (`internal/locale`).
-- Явно: переменная **`DQ_LANG=en|ru|auto`** (приоритетнее автоопределения) или глобальный флаг **`dq --lang en|ru|auto`** (persistent-флаг; допускается и `dq up --lang ru`).
-- Имя продукта в `dq version` и корневом help: **Docker Quick-ops** (без перевода).
-
----
-
-## 9. Безопасность SSH
-
-- Поведение SSH как **accept-new** для known_hosts (аналог `StrictHostKeyChecking=accept-new` в OpenSSH).
+- UI language (messages, subcommand help, errors): **English by default**.
+- If the system locale is **Russian** (`LANGUAGE`, `LC_ALL`, `LC_MESSAGES`, `LANG` — `ru` prefix) — use **Russian** (`internal/locale`).
+- Explicit: **`DQ_LANG=en|ru|auto`** (overrides auto) or global **`dq --lang en|ru|auto`** (persistent flag; e.g. `dq up --lang ru` allowed).
+- Product name in `dq version` and root help: **Docker Quick-ops** (not translated).
 
 ---
 
-## 10. Лицензирование
+## 9. SSH security
 
-- Лицензия проекта: **Apache License 2.0** (файл `**LICENSE`** в корне репозитория). Право дорабатывать, форкать и использовать в своих проектах с соблюдением условий лицензии.
-- Подпись бинарников (cosign и т.д.) в v1 **не обязательна**.
-
----
-
-## 11. Совместимость с прежними именами файлов
-
-- Старые имена (`**docker-ops.remote.yaml`**, `**docker-ops.remote.env`** и т.п.) не поддерживаются: только `**docker-ops.yaml` / `docker-ops.yml**` + `**dq.env**`. Миграция — вручную по документации.
+- SSH host key behaviour like **accept-new** for known_hosts (analogous to `StrictHostKeyChecking=accept-new` in OpenSSH).
 
 ---
 
-## 12. Миграция с прежней Bash-версии
+## 10. Licensing
 
-- Соответствие полей старых `docker-ops.remote.*` / переменных окружения → `docker-ops.yaml` + `dq.env` — задокументировать (таблица в roadmap).
-- Автоматической миграции **нет** (при желании — отдельно).
-- Bash/Python-скрипты из репозитория **удалены**; используйте только `dq`.
-
----
-
-## 13. Критерии приёмки (черновик)
-
-- Все команды из §5.3 в локальном режиме на Linux с установленным Docker.
-- Удалённый режим без `dq` на сервере: e2e `deploy` (`source` и `artifacts` с save/load) по SSH.
-- Нет зависимости от Python и обязательного `rsync` на клиенте; sync по SFTP + size/mtime.
-- Конфиг только в корне: `docker-ops.yaml` | `docker-ops.yml`; секреты в `dq.env`; приоритет слияния — **§14.1**.
-- `dq completion bash|zsh` и man согласно §4.6.
-- Локализация: en по умолчанию, ru при русской локали / `DQ_LANG` / `--lang` (**§8**).
-- Сценарий пользователя на **WSL2** задокументирован и проверен по возможности.
+- Project license: **Apache License 2.0** (`**LICENSE**` in repo root). Fork and use per license terms.
+- Binary signing (cosign, etc.) not required in v1.
 
 ---
 
-## 14. Принятые решения (уточнения)
+## 11. Legacy file names
 
-### 14.1 Приоритет конфигурации и `dq.env`
-
-Для каждого параметра (ключ в YAML, логическое имя переменной окружения) действует порядок **от более слабого к более сильному** (более сильный перекрывает более слабый):
-
-1. `**docker-ops.yaml` / `docker-ops.yml`** — базовые значения из файла в корне проекта.
-2. `**dq.env`** — значения из файла секретов; **перекрывают** совпадающие параметры из YAML (один и тот же ключ задаётся либо в YAML, либо в `dq.env`; при наличии в обоих побеждает `dq.env`).
-3. **Переменные окружения процесса** (включая CI/CD, `export`, systemd) — **наивысший приоритет**; перекрывают и YAML, и `dq.env`.
-
-Параметры, заданные **только** в YAML и отсутствующие в `dq.env` и в env процесса, берутся из YAML. Пустая или отсутствующая строка в `dq.env` не должна затирать значение из YAML без явной договорённости в коде (рекомендация: пустое значение трактовать как «не задано» и не переопределять YAML).
-
-### 14.2 Удалённый Docker API и SSH-сокет
-
-Доступ к Docker на удалённом хосте для будущей интеграции с API: **через SSH к сокету Docker на сервере** (типично Unix-domain socket `/var/run/docker.sock`). Реализация на стороне `dq`: установить **SSH-туннель** (или эквивалент в используемой SSH-библиотеке), чтобы на машине пользователя появился локальный endpoint (Unix-socket или `127.0.0.1:порт`), указывающий на удалённый Docker; клиент API Docker подключается к этому endpoint. Отдельное открытие Docker daemon в интернет **не требуется**.
-
-### 14.3 Лицензия
-
-Используется **Apache License, Version 2.0**; полный текст — в файле `**LICENSE`** в корне репозитория.
+- Old names (`**docker-ops.remote.yaml**`, `**docker-ops.remote.env**`, etc.) are **not** supported: only `**docker-ops.yaml` / `docker-ops.yml**` + `**dq.env**`. Migrate manually per docs.
 
 ---
 
-## Реализация (Go)
+## 12. Migration from the Bash version
 
-- Исходники: `cmd/dq`, `internal/config`, `internal/cli`, `internal/compose`, `internal/deploy`, `internal/sshexec`, `internal/remote`, `internal/version`, `tools/genman`.
-- Отдельных Bash/Python-скриптов в репозитории **нет** (раньше — `scripts/`).
-- Сборка: `make build` → `bin/dq`; `make install` — через `go install`.
-- Тесты: `make test` / `make test-unit` (`-race`); `make test-integration` — `-tags=integration` (нужен Docker с плагином **Compose V2**).
-- Подробный статус по пунктам — в **Roadmap** ниже.
+- Mapping old `docker-ops.remote.*` / env vars → `docker-ops.yaml` + `dq.env` — document in roadmap table.
+- **No** automatic migration (optional tool separately).
+- Bash/Python scripts **removed** from the repo; use **`dq`** only.
 
 ---
 
-## Roadmap (статус реализации)
+## 13. Acceptance criteria (draft)
 
-Легенда: `[x]` сделано · `[ ]` не сделано / в планах.
+- All commands from §5.3 in local mode on Linux with Docker installed.
+- Remote mode without `dq` on server: e2e `deploy` (`source` and `artifacts` with save/load) over SSH.
+- No Python or mandatory `rsync` on client; sync via SFTP + size/mtime.
+- Config only at root: `docker-ops.yaml` | `docker-ops.yml`; secrets in `dq.env`; merge order **§14.1**.
+- `dq completion bash|zsh` and man per §4.6.
+- Localization: en default, ru for Russian locale / `DQ_LANG` / `--lang` (**§8**).
+- WSL2 user scenario documented and verified where possible.
 
-### Конфигурация и валидация
+---
 
-- [x] `docker-ops.yaml` / `docker-ops.yml` только в корне проекта
-- [x] `dq.env` и приоритет слияния **§14.1** (YAML → dq.env → env процесса)
-- [x] Дефолты `compose_project_name` (имя каталога), `compose_file`, `compose_service`
-- [x] Команда `dq validate` (YAML, `deploy_mode`, `app_config` на диске, синтаксис `dq.env`)
-- [x] Понятные сообщения при синтаксической ошибке YAML (контекст строк, подсказки про отступы)
-- [x] Команда `dq env` (`--output`, `--force`, `--anonymize`)
-- [ ] Расширенная семантическая валидация (например все поля deploy, ssh_identity существует)
+## 14. Decisions (clarifications)
 
-### Локальный режим (Docker Compose через CLI)
+### 14.1 Configuration precedence and `dq.env`
+
+For each parameter (YAML key, logical env var name), order is **weaker → stronger** (stronger overrides):
+
+1. `**docker-ops.yaml` / `docker-ops.yml**` — base values from file at project root.
+2. `**dq.env**` — secrets file; **overrides** matching parameters from YAML (same key in either file; if both exist, **`dq.env` wins**).
+3. **Process environment** (CI/CD, `export`, systemd) — **highest**; overrides YAML and `dq.env`.
+
+Parameters only in YAML and absent from `dq.env` and process env come from YAML. Empty or missing lines in `dq.env` should not wipe YAML without an explicit rule in code (recommendation: treat empty as “unset” and do not override YAML).
+
+### 14.2 Remote Docker API and SSH socket
+
+Future Docker API access on remote hosts: **via SSH to the Docker socket** on the server (typically Unix socket `/var/run/docker.sock`). `dq` should establish an **SSH tunnel** (or library equivalent) so the user machine gets a local endpoint (Unix socket or `127.0.0.1:port`) pointing at remote Docker; API client talks to that endpoint. No need to expose the Docker daemon on the internet.
+
+### 14.3 License
+
+**Apache License, Version 2.0**; full text in **`LICENSE`** at repo root.
+
+---
+
+## Implementation (Go)
+
+- Sources: `cmd/dq`, `internal/config`, `internal/cli`, `internal/compose`, `internal/deploy`, `internal/sshexec`, `internal/remote`, `internal/version`, `tools/genman`.
+- **No** Bash/Python scripts in the repo (formerly `scripts/`).
+- Build: `make build` → `bin/dq`; `make install` via `go install`.
+- Tests: `make test` / `make test-unit` (`-race`); `make test-integration` — `-tags=integration` (Docker with **Compose V2** plugin required).
+- Detailed status — **Roadmap** below.
+
+---
+
+## Roadmap (implementation status)
+
+Legend: `[x]` done · `[ ]` not done / planned.
+
+### Configuration and validation
+
+- [x] `docker-ops.yaml` / `docker-ops.yml` only at project root
+- [x] `dq.env` and merge order **§14.1** (YAML → dq.env → process env)
+- [x] Defaults `compose_project_name` (directory name), `compose_file`, `compose_service`
+- [x] `dq validate` (YAML, `deploy_mode`, `app_config` on disk, `dq.env` syntax)
+- [x] Clear errors on YAML syntax (line context, indentation hints)
+- [x] `dq env` (`--output`, `--force`, `--anonymize`)
+- [ ] Deeper semantic validation (e.g. all deploy fields, `ssh_identity` exists)
+
+### Local mode (Docker Compose via CLI)
 
 - [x] `build`, `pull`, `up`, `down`, `reup`, `ps`, `restart`, `exec`, `status`, `logs`, `logs-tail`
-- [x] Проверка `app_config` перед `up` / `reup`, если путь задан
-- [x] Интеграционный тест с Docker (`-tags=integration`)
-- [x] Требование **Compose V2** (`docker compose`); без fallback на `docker-compose` V1 — при отсутствии плагина показывается инструкция по установке
+- [x] Check `app_config` before `up` / `reup` when path set
+- [x] Integration test with Docker (`-tags=integration`)
+- [x] **Compose V2** required (`docker compose`); no `docker-compose` V1 fallback — missing plugin shows install hint
 
-### Удалённый режим (без бинарника `dq` на сервере)
+### Remote mode (no `dq` binary on server)
 
-- [x] Выполнение compose-команд по **SSH** в `remote_path` (`internal/sshexec`, `internal/remote`) — `build`, `pull`, `up`, `down`, `reup`, `ps`, `restart`, `exec`, `status`, `logs`, `logs-tail`
-- [x] Аутентификация: `ssh_identity` (путь, `~` допускается) и/или **ssh-agent** (`SSH_AUTH_SOCK`)
-- [x] Новые ключи хоста: запись в `~/.ssh/known_hosts` (аналог **accept-new**); смена ключа — отказ
-- [x] TTY / PTY для `logs -f` при интерактивном терминале
-- [x] Отключение remote: `DOCKER_OPS_USE_REMOTE=0` или `use_remote: false` в YAML
+- [x] Compose commands over **SSH** in `remote_path` (`internal/sshexec`, `internal/remote`) — `build`, `pull`, `up`, `down`, `reup`, `ps`, `restart`, `exec`, `status`, `logs`, `logs-tail`
+- [x] Auth: `ssh_identity` (path, `~` allowed) and/or **ssh-agent** (`SSH_AUTH_SOCK`)
+- [x] New host keys: append to `~/.ssh/known_hosts` (**accept-new**); key change — refuse
+- [x] TTY / PTY for `logs -f` with interactive terminal
+- [x] Disable remote: `DOCKER_OPS_USE_REMOTE=0` or `use_remote: false` in YAML
 
-### Деплой
+### Deploy
 
-- [x] **`deploy` в режиме `source`:** SFTP-синхронизация дерева, exclude-лист, `deploy_include`, опционально `app_config`, затем удалённый `reup`
-- [x] **`deploy` в режиме `artifacts`:** `docker build`, ветка registry vs `save`/`load`, доставка `docker-compose.image.yml` и файлов, удалённый `pull`+`up` или только `up`
-- [ ] Маппинг `rsync_extra` → опции встроенного sync (если остаётся в ТЗ)
+- [x] **`deploy` in `source` mode:** SFTP tree sync, exclude list, `deploy_include`, optional `app_config`, remote `reup`
+- [x] **`deploy` in `artifacts` mode:** `docker build`, registry vs `save`/`load`, deliver `docker-compose.image.yml` and files, remote `pull`+`up` or `up`
+- [ ] Map `rsync_extra` → internal sync options (if still in spec)
 
-### Docker помимо `docker compose` CLI
+### Docker beyond `docker compose` CLI
 
-- [ ] Работа через **docker.sock** / API локально (**§4.4**)
-- [ ] Удалённый Docker API через **SSH-туннель к сокету** (**§14.2**)
+- [ ] Local **docker.sock** / API (**§4.4**)
+- [ ] Remote Docker API via **SSH tunnel to socket** (**§14.2**)
 
-### CLI, документация, релиз
+### CLI, docs, release
 
 - [x] Cobra, `dq completion` (bash / zsh / fish / powershell)
-- [x] `dq version` + ldflags из Makefile
-- [x] **man-страницы**: `dq man`, `make gen-man` / `make install-man` (**§4.6**)
-- [x] **GoReleaser** + CI-матрица OS/arch, архивы, checksums (**§7**, `.goreleaser.yaml`, `.github/workflows/`)
-- [ ] Краткая документация по **WSL2** (**§6**)
-- [ ] Таблица миграции полей старых `docker-ops.remote.*` → `docker-ops.yaml` / `dq.env` (**§12**)
+- [x] `dq version` + Makefile ldflags
+- [x] **Man pages:** `dq man`, `make gen-man` / `make install-man` (**§4.6**)
+- [x] **GoReleaser** + CI OS/arch matrix, archives, checksums (**§7**, `.goreleaser.yaml`, `.github/workflows/`)
+- [ ] Short **WSL2** doc (**§6**)
+- [ ] Migration table old `docker-ops.remote.*` → `docker-ops.yaml` / `dq.env` (**§12**)
 
-### Локализация
+### Localization
 
-- [x] Сообщения и help: **en по умолчанию**, **ru** при русской локали (**§8**), пакет `internal/locale`
-- [x] Флаг **`--lang`**, переменная **`DQ_LANG`**
+- [x] Messages and help: **en default**, **ru** for Russian locale (**§8**), package `internal/locale`
+- [x] **`--lang`**, **`DQ_LANG`**
 
-### Прочее
+### Other
 
-- [ ] Подпись артефактов (cosign и т.д.) — не обязательна в v1 (**§10**)
+- [ ] Artifact signing (cosign, etc.) — not required in v1 (**§10**)
 
 ---
 
-*При необходимости вынести в `docs/spec-dq.md`; `readme.md` — живой черновик ТЗ.*
+*May move to `docs/spec-dq.md`; this `readme.md` is the living English spec. Russian: [readme.ru.md](readme.ru.md).*

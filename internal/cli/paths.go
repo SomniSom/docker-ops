@@ -9,6 +9,8 @@ import (
 	"github.com/SomniSom/docker-ops/internal/locale"
 )
 
+// resolveAppConfigPath returns an absolute path for appConfig: if appConfig is already
+// absolute (after Clean), it is returned as-is; otherwise it is joined under root.
 func resolveAppConfigPath(root, appConfig string) string {
 	appConfig = strings.TrimSpace(appConfig)
 	p := filepath.Clean(appConfig)
@@ -18,6 +20,8 @@ func resolveAppConfigPath(root, appConfig string) string {
 	return filepath.Join(root, p)
 }
 
+// checkAppConfigExists returns nil if appConfig is empty. Otherwise it requires the
+// resolved path to exist and be a regular file (not a directory).
 func checkAppConfigExists(root, appConfig string) error {
 	if appConfig == "" {
 		return nil

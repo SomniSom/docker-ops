@@ -10,6 +10,8 @@ import (
 	"github.com/SomniSom/docker-ops/internal/locale"
 )
 
+// newValidateCmd creates "validate": resolves docker-ops.yml, validates schema and dq.env
+// if present, loads config and notes when remote SSH compose is configured.
 func newValidateCmd(projectDir *string) *cobra.Command {
 	return &cobra.Command{
 		Use:   "validate",

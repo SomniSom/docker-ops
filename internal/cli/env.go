@@ -10,6 +10,8 @@ import (
 	"github.com/SomniSom/docker-ops/internal/locale"
 )
 
+// newEnvCmd creates "env": writes or prints the docker-ops.yaml remote template from
+// the loaded config (supports --output, --force, --anonymize).
 func newEnvCmd(projectDir *string) *cobra.Command {
 	var outPath string
 	var force, anonymize bool
