@@ -18,14 +18,15 @@ func RunRemoteReup(client *ssh.Client, cfg *config.Config) error {
 }
 
 // RunRemoteArtifactsFinish runs config-check, then pull+up or up only (save/load), with optional compose file override.
-func RunRemoteArtifactsFinish(client *ssh.Client, cfg *config.Config, composeFileOverride string, skipPull bool) error {
+// exportDeployImage adds export DEPLOY_IMAGE=... when true (compose file still references ${DEPLOY_IMAGE}).
+func RunRemoteArtifactsFinish(client *ssh.Client, cfg *config.Config, composeFileOverride string, skipPull bool, exportDeployImage bool) error {
 	var steps [][]string
 	if skipPull {
 		steps = [][]string{{"up", "-d"}}
 	} else {
 		steps = [][]string{{"pull"}, {"up", "-d"}}
 	}
-	return runRemoteComposeChain(client, cfg, composeFileOverride, true, steps)
+	return runRemoteComposeChain(client, cfg, composeFileOverride, exportDeployImage, steps)
 }
 
 func runRemoteComposeChain(client *ssh.Client, cfg *config.Config, composeFileOverride string, exportDeployImage bool, steps [][]string) error {

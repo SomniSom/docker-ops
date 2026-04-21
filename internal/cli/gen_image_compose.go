@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"strings"
@@ -62,6 +63,9 @@ func newGenImageComposeCmd(projectDir *string) *cobra.Command {
 				TargetService: svc,
 				ImageExpr:     strings.TrimSpace(imageExpr),
 				AllBuilt:      allBuilt,
+			}
+			if allBuilt && len(cfg.DeployImages) > 0 {
+				opts.ServiceImages = maps.Clone(cfg.DeployImages)
 			}
 			gen, err := composeimage.GenerateForArtifacts(b, opts)
 			if err != nil {

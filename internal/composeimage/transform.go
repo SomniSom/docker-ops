@@ -12,8 +12,12 @@ import (
 type Options struct {
 	// TargetService is the app service whose build: block is replaced when AllBuilt is false (required then).
 	TargetService string
-	// ImageExpr is the YAML value for image: (default ${DEPLOY_IMAGE}).
+	// ImageExpr is the YAML value for image: when ServiceImages is nil (default ${DEPLOY_IMAGE}).
 	ImageExpr string
+	// ServiceImages maps service name → full image reference for AllBuilt mode. When non-nil,
+	// every service with build: must appear in the map; each gets that literal image: value.
+	// When nil and AllBuilt, ImageExpr is used for all built services (same tag).
+	ServiceImages map[string]string
 	// AllBuilt if true, every service with build: is converted to image: (same ImageExpr).
 	// If false, only TargetService is converted and any other service with build: is an error.
 	AllBuilt bool
@@ -87,6 +91,7 @@ func GenerateForArtifacts(composeYAML []byte, o Options) ([]byte, error) {
 	outSvcs := out["services"].(map[string]interface{})
 
 	if o.AllBuilt {
+		perSvc := o.ServiceImages
 		converted := 0
 		for name, raw := range outSvcs {
 			if raw == nil {
@@ -99,9 +104,23 @@ func GenerateForArtifacts(composeYAML []byte, o Options) ([]byte, error) {
 			if !hasBuild(svc) {
 				continue
 			}
+			var imageVal string
+			if len(perSvc) > 0 {
+				ref, ok := perSvc[name]
+				if !ok {
+					return nil, fmt.Errorf("deploy_images missing entry for service %q (every built service needs an image tag)", name)
+				}
+				ref = strings.TrimSpace(ref)
+				if ref == "" {
+					return nil, fmt.Errorf("deploy_images[%q] is empty", name)
+				}
+				imageVal = ref
+			} else {
+				imageVal = img
+			}
 			cp := cloneMapStringInterface(svc)
 			delete(cp, "build")
-			cp["image"] = img
+			cp["image"] = imageVal
 			outSvcs[name] = cp
 			converted++
 		}

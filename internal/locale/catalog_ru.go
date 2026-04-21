@@ -25,7 +25,7 @@ var catalogRu = map[string]string{
 
 Source (по умолчанию): зеркалирование дерева с исключениями (размер/mtime), deploy_include, app_config, затем удалённый reup.
 
-Artifacts: нужны docker-compose.image.yml и deploy_image; опционально docker build/push или save|ssh|load; затем удалённый pull+up или up. Файл compose: dq gen-image-compose. Флаг --build выполняет docker build -t deploy_image перед save/load (или push при registry), даже если deploy_push не задан.`,
+Artifacts: нужен docker-compose.image.yml. Один образ: deploy_image. Несколько собираемых сервисов: deploy_images (имя сервиса → тег) и dq gen-image-compose --all-built с теми же тегами; каждый сервис собирается из своего build context в compose. Опционально docker build/push или save|ssh|load; затем удалённый pull+up или up. Флаг --build выполняет локальный docker build для каждого образа перед save/load (или push), даже если deploy_push не задан.`,
 	"deploy.err.needs_remote": "для deploy нужны remote_ssh и remote_path (docker-ops.yml или dq.env); выполните «dq validate»",
 	"deploy.flag.build":       "artifacts: docker build -t deploy_image, затем save/load или push по настройкам",
 
@@ -139,7 +139,11 @@ Fish:
 
 	"deploy.art.docker_build": "docker build",
 	"deploy.art.docker_push":  "docker push",
-	"deploy.art.err.image":    "deploy_mode=artifacts требует deploy_image (docker-ops.yml или dq.env)",
+	"deploy.art.err.image":    "deploy_mode=artifacts требует deploy_image или deploy_images (docker-ops.yml или dq.env)",
+	"deploy.art.err.images_empty": "в deploy_images нет непустых тегов образов",
+	"deploy.art.err.no_build_service": "deploy_images: у сервиса %q нет build: в %s — добавьте build: или уберите запись",
+	"deploy.art.err.no_images": "внутренняя ошибка: нечего передавать (нет образов)",
+	"deploy.art.err.read_compose": "чтение compose %s",
 	"deploy.art.err.compose":  "деплой artifacts требует %s в корне проекта",
 	"deploy.art.upload":       "загрузка compose",
 	"deploy.art.remote_up_sl": "==> удалённо: compose up (образ загружен локально)\n",
@@ -147,6 +151,7 @@ Fish:
 	"deploy.art.save_gzip":    "==> docker save (gzip) | ssh … docker load\n",
 	"deploy.art.save_plain":   "==> docker save | ssh … docker load\n",
 	"deploy.art.build":        "==> docker build -t %s\n",
+	"deploy.art.build_svc":    "==> docker build -t %s (сервис %s)\n",
 	"deploy.art.push":         "==> docker push %s\n",
 
 	"deploy.inc.skip_abs":    "dq: deploy_include: пропуск абсолютного пути %q\n",
@@ -178,11 +183,12 @@ Fish:
 	"genimg.short": "Собрать docker-compose.image.yml из compose_file для деплоя artifacts",
 	"genimg.long": `Переводит сервис приложения с build: на image: (по умолчанию compose_service). Сервисы только с image: не меняются.
 
-Ошибка, если у другого сервиса остаётся build: (флаг --all-built — только если несколько сборок с одним тегом).
+Если у других сервисов остаётся build:, используйте --all-built: либо один тег (${DEPLOY_IMAGE}) для всех, либо задайте deploy_images в docker-ops.yml — карту имя сервиса → полный тег образа.
 
 Примеры:
   dq gen-image-compose
-  dq gen-image-compose --service app -o docker-compose.image.yml`,
+  dq gen-image-compose --service app -o docker-compose.image.yml
+  dq gen-image-compose --all-built`,
 	"genimg.header": "# Сгенерировано dq gen-image-compose — задайте DEPLOY_IMAGE при деплое (docker-ops.yml / dq.env).",
 	"genimg.wrote":  "записано %s",
 	"genimg.err.read":       "чтение %s",
@@ -193,7 +199,7 @@ Fish:
 	"genimg.flag.compose_file":  "входной compose относительно корня (по умолчанию compose_file из конфига)",
 	"genimg.flag.service":       "сервис для конвертации (по умолчанию compose_service)",
 	"genimg.flag.image_expr":    "значение для image: (по умолчанию ${DEPLOY_IMAGE})",
-	"genimg.flag.all_built":     "конвертировать все сервисы с build: в один и тот же образ",
+	"genimg.flag.all_built":     "все сервисы с build:; per-service теги через deploy_images в конфиге",
 
 	"man.short": "Открыть man-страницу (groff) для dq или подкоманды",
 	"man.long": `Страница собирается из справки Cobra и показывается через man -l (нужны man-db / groff).

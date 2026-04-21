@@ -111,7 +111,7 @@ Minimal set (snake_case in YAML):
 | Compose | `compose_project_name`, `compose_file`, `compose_service` |
 | Remote | `remote_ssh`, `remote_path`, `ssh_identity` |
 | Sync | `exclude` list (global); options equivalent to legacy `rsync_extra` map to internal sync |
-| Deploy | `deploy_mode` (`source` or `artifacts`), `deploy_image`, `deploy_push`, `deploy_use_registry`, `deploy_save_load`, `deploy_save_compress` |
+| Deploy | `deploy_mode` (`source` or `artifacts`), `deploy_image` (single built image), optional `deploy_images` (map: compose service name → image ref for multiple `build:` services), `deploy_push`, `deploy_use_registry`, `deploy_save_load`, `deploy_save_compress` |
 | Extra paths | `deploy_include` — relative to project root |
 | Application | `**app_config**` (or equivalent): **optional** path to app config for copying in `artifacts` and for `config-check`; if unset — **check/copy not required** (often no file exists) |
 | UX | `help_show_effective` and others as needed |
@@ -132,7 +132,7 @@ Minimal set (snake_case in YAML):
 **`deploy`:**
 
 - **`source`:** directory on server, tree sync with exclude, copy **app_config** when configured and file exists, then remote `reup`.
-- **`artifacts`:** optional local `docker build` (`deploy_push: true` in config or **`dq deploy --build`** without requiring `deploy_push`); registry vs save/load; deliver `docker-compose.image.yml`, **app_config** if set, `deploy_include`; on server over SSH: `config-check` (if applicable) → `up` or `pull`+`up`. **The `dq` binary is not copied to the server.** Draft `docker-compose.image.yml` from base compose: **`dq gen-image-compose`** (one service with `build:`, others `image:` only).
+- **`artifacts`:** optional local `docker build` (`deploy_push: true` in config or **`dq deploy --build`** without requiring `deploy_push`); registry vs save/load; deliver `docker-compose.image.yml`, **app_config** if set, `deploy_include`; on server over SSH: `config-check` (if applicable) → `up` or `pull`+`up`. **The `dq` binary is not copied to the server.** Draft `docker-compose.image.yml` from base compose: **`dq gen-image-compose`** (one service with `build:` and `deploy_image`, others `image:` only). For several built services, set **`deploy_images`** and use **`dq gen-image-compose --all-built`** so each service gets its own image tag; **`deploy`/`--build`** builds each context and saves or pushes all images. If **`deploy_images` is unset or empty**, behaviour matches the previous single-`deploy_image` flow.
 - **Data on server (`artifacts`):** the whole `remote_path` tree is **not** mirrored — arbitrary files and dirs (e.g. **`db-data`** for PostgreSQL) are **not** deleted unless you list them in **`deploy_include`** and overwrite from local. Ensure **`docker-compose.image.yml`** uses the same volume/path for DB data (`./db-data:/var/lib/postgresql/data`, etc.); plain **`docker compose up`** does not wipe a host bind-mount dir. **`source`** behaves differently (sync may delete extras on server) — riskier for a live DB inside the project tree.
 
 ### 5.4 `env` command (template)

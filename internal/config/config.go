@@ -18,6 +18,9 @@ type Config struct {
 	RsyncExtra         string   `yaml:"rsync_extra"`
 	DeployMode         string   `yaml:"deploy_mode"`
 	DeployImage        string   `yaml:"deploy_image"`
+	// DeployImages maps compose service name → image ref for artifacts deploy when several
+	// services use build:. If set, each is built and pushed/save-loaded; deploy_image is ignored.
+	DeployImages       map[string]string `yaml:"deploy_images"`
 	DeployPush         *bool    `yaml:"deploy_push"`
 	DeployUseRegistry  *bool    `yaml:"deploy_use_registry"`
 	DeploySaveLoad     *bool    `yaml:"deploy_save_load"`

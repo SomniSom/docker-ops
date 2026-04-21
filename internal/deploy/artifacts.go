@@ -18,14 +18,10 @@ import (
 
 const artifactsComposeFile = "docker-compose.image.yml"
 
-// RunArtifacts builds/pushes or save-loads the image, syncs compose + config + includes, then remote pull+up or up (readme §5.3).
+// RunArtifacts builds/pushes or save-loads the image(s), syncs compose + config + includes, then remote pull+up or up (readme §5.3).
 func RunArtifacts(projectRoot string, cfg *config.Config, opts RunOpts) error {
 	if cfg == nil || !cfg.RemoteConfigured() {
 		return fmt.Errorf("%s", locale.T("err.remote_not_configured"))
-	}
-	img := strings.TrimSpace(cfg.DeployImage)
-	if img == "" {
-		return fmt.Errorf("%s", locale.T("deploy.art.err.image"))
 	}
 	projectRoot = filepath.Clean(projectRoot)
 	composeLocal := filepath.Join(projectRoot, artifactsComposeFile)
@@ -33,16 +29,15 @@ func RunArtifacts(projectRoot string, cfg *config.Config, opts RunOpts) error {
 		return fmt.Errorf("%s", locale.Tf("deploy.art.err.compose", artifactsComposeFile))
 	}
 
-	needBuild := EffectiveDeployPush(cfg) || opts.Build
-	if needBuild {
-		fmt.Fprint(os.Stderr, locale.Tf("deploy.art.build", img))
-		cmd := exec.Command("docker", "build", "-t", img, ".")
-		cmd.Dir = projectRoot
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-		if err := cmd.Run(); err != nil {
-			return fmt.Errorf("%s: %w", locale.T("deploy.art.docker_build"), err)
-		}
+	baseComposePath := filepath.Join(projectRoot, cfg.ComposeFile)
+	baseComposeBytes, err := os.ReadFile(baseComposePath)
+	if err != nil {
+		return fmt.Errorf("%s: %w", locale.Tf("deploy.art.err.read_compose", baseComposePath), err)
+	}
+
+	imageRefs, err := runArtifactBuilds(projectRoot, cfg, opts, baseComposeBytes)
+	if err != nil {
+		return err
 	}
 
 	useSL := ArtifactsUseSaveLoad(cfg)
@@ -54,17 +49,12 @@ func RunArtifacts(projectRoot string, cfg *config.Config, opts RunOpts) error {
 	defer client.Close()
 
 	if useSL {
-		if err := dockerSaveLoad(client, projectRoot, img, EffectiveSaveCompress(cfg)); err != nil {
+		if err := dockerSaveLoadMulti(client, projectRoot, imageRefs, EffectiveSaveCompress(cfg)); err != nil {
 			return err
 		}
 	} else if !useSL && (EffectiveDeployPush(cfg) || opts.Build) {
-		fmt.Fprint(os.Stderr, locale.Tf("deploy.art.push", img))
-		cmd := exec.Command("docker", "push", img)
-		cmd.Dir = projectRoot
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-		if err := cmd.Run(); err != nil {
-			return fmt.Errorf("%s: %w", locale.T("deploy.art.docker_push"), err)
+		if err := dockerPushMulti(projectRoot, imageRefs); err != nil {
+			return err
 		}
 	}
 
@@ -101,7 +91,13 @@ func RunArtifacts(projectRoot string, cfg *config.Config, opts RunOpts) error {
 	} else {
 		fmt.Fprint(os.Stderr, locale.T("deploy.art.remote_pull"))
 	}
-	return RunRemoteArtifactsFinish(client, cfg, artifactsComposeFile, skipPull)
+
+	composeBytes, err := os.ReadFile(composeLocal)
+	if err != nil {
+		return err
+	}
+	exportDeployImage := strings.Contains(string(composeBytes), "${DEPLOY_IMAGE}")
+	return RunRemoteArtifactsFinish(client, cfg, artifactsComposeFile, skipPull, exportDeployImage)
 }
 
 func putLocalFile(c *sftp.Client, localPath, rem string) error {
@@ -121,7 +117,7 @@ func putLocalFile(c *sftp.Client, localPath, rem string) error {
 func dockerSaveLoad(client *ssh.Client, projectRoot, image string, compress bool) error {
 	if compress {
 		fmt.Fprint(os.Stderr, locale.T("deploy.art.save_gzip"))
-		inner := fmt.Sprintf("docker save %s | gzip -c", sshexec.ShellQuote(image))
+		inner := fmt.Sprintf("docker %s | gzip -c", sshexec.QuoteArgs([]string{"save", image}))
 		cmd := exec.Command("bash", "-c", inner)
 		cmd.Dir = projectRoot
 		stdout, err := cmd.StdoutPipe()

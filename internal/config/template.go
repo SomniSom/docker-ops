@@ -53,6 +53,10 @@ compose_service: %s
 # deploy_mode: artifacts
 # compose_file: docker-compose.image.yml
 # deploy_image: ghcr.io/you/app:1.0.0
+# # Or several built services (map service name from compose → image tag):
+# # deploy_images:
+# #   app: ghcr.io/you/app:1.0.0
+# #   worker: ghcr.io/you/worker:1.0.0
 # deploy_push: true
 
 # Extra paths relative to project root (deploy_include):
