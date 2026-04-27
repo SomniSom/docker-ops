@@ -33,6 +33,14 @@ func ArtifactsUseSaveLoad(cfg *config.Config) bool {
 		return false
 	}
 	img := strings.TrimSpace(cfg.DeployImage)
+	if img == "" {
+		for _, v := range cfg.DeployImages {
+			if t := strings.TrimSpace(v); t != "" {
+				img = t
+				break
+			}
+		}
+	}
 	return !strings.Contains(img, "/")
 }
 

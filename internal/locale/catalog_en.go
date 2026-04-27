@@ -9,6 +9,7 @@ var catalogEn = map[string]string{
 	"flag.project_root": "project root (default: $DQ_PROJECT_ROOT or cwd)",
 
 	"version.short": "Print version information",
+	"version.hint_not_release": "Note: this line is the Go module version (e.g. from go install), not the product release tag. For tag v1.x use a binary from GitHub Releases, or: make build VERSION=$(git describe --tags --always …)",
 
 	"validate.short": "Validate docker-ops.yaml / docker-ops.yml syntax and fields",
 	"validate.long": `Parses the config file in the project root and reports clear errors for invalid YAML
@@ -141,7 +142,7 @@ Docker said: %s`,
 
 	"deploy.art.docker_build": "docker build",
 	"deploy.art.docker_push":  "docker push",
-	"deploy.art.err.image":    "deploy_mode=artifacts requires deploy_image or deploy_images (docker-ops.yml or dq.env)",
+	"deploy.art.err.image":    "deploy_mode=artifacts requires deploy_image, or a non-empty deploy_images map in docker-ops.yaml (top-level), or DEPLOY_IMAGES=svc=ref,svc2=ref2 in dq.env / process env. If deploy_images is in YAML, check YAML shape (mapping) and project root (dq -p or cwd finds docker-ops.yml)",
 	"deploy.art.err.images_empty": "deploy_images has no non-empty image tags",
 	"deploy.art.err.no_build_service": "deploy_images: service %q has no build: in %s — add build: or remove the entry",
 	"deploy.art.err.no_images": "internal: no images to transfer",

@@ -2,9 +2,13 @@
 package version
 
 import (
+	"regexp"
 	"runtime/debug"
 	"strings"
 )
+
+// tagSemver matches a release line from GoReleaser / make VERSION=v1.2.3 (no pre-release suffix).
+var tagSemver = regexp.MustCompile(`^v[0-9]+\.[0-9]+\.[0-9]+$`)
 
 var (
 	// Name is the full product name (readme §3).
@@ -65,4 +69,14 @@ func normalizeVersion() {
 	if Version == "" || Version == "unknown" {
 		Version = "dev"
 	}
+}
+
+// ShowModuleVersionNote is true when the reported version is not a plain v1.2.3 from release
+// ldflags — e.g. go install reported pseudo-version. Then dq version prints a short extra line.
+func ShowModuleVersionNote() bool {
+	v := strings.TrimSpace(Version)
+	if v == "" || v == "dev" {
+		return false
+	}
+	return !tagSemver.MatchString(v)
 }

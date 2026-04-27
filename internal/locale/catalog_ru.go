@@ -8,6 +8,7 @@ var catalogRu = map[string]string{
 	"flag.project_root": "корень проекта (по умолчанию: $DQ_PROJECT_ROOT или текущий каталог)",
 
 	"version.short": "Показать сведения о версии",
+	"version.hint_not_release": "Эта строка — версия модуля Go (например, из go install), а не тег релиза продукта. Нужен тег v1.x — скачайте архив с GitHub Releases или: make build VERSION=$(git describe --tags --always …)",
 
 	"validate.short": "Проверить синтаксис и поля docker-ops.yaml / docker-ops.yml",
 	"validate.long": `Разбирает конфиг в корне проекта и выдаёт понятные ошибки при неверном YAML
@@ -140,7 +141,7 @@ Fish:
 
 	"deploy.art.docker_build": "docker build",
 	"deploy.art.docker_push":  "docker push",
-	"deploy.art.err.image":    "deploy_mode=artifacts требует deploy_image или deploy_images (docker-ops.yml или dq.env)",
+	"deploy.art.err.image":    "для deploy_mode=artifacts задайте deploy_image, или непустую мапу deploy_images в docker-ops.yaml (на верхнем уровне), или в dq.env/окружении: DEPLOY_IMAGES=сервис=тег,сервис2=тег2. Проверьте форму YAML (маппинг) и что dq видит тот же каталог (cwd или --project-dir).",
 	"deploy.art.err.images_empty": "в deploy_images нет непустых тегов образов",
 	"deploy.art.err.no_build_service": "deploy_images: у сервиса %q нет build: в %s — добавьте build: или уберите запись",
 	"deploy.art.err.no_images": "внутренняя ошибка: нечего передавать (нет образов)",

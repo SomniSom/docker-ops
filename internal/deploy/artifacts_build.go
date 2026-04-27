@@ -39,11 +39,11 @@ func runArtifactBuilds(projectRoot string, cfg *config.Config, opts RunOpts, bas
 	multi := cfg.DeployImages
 	needBuild := EffectiveDeployPush(cfg) || opts.Build
 
+	if !cfg.HasDeployImageOrImages() {
+		return nil, fmt.Errorf("%s", locale.T("deploy.art.err.image"))
+	}
 	if len(multi) == 0 {
 		img := strings.TrimSpace(cfg.DeployImage)
-		if img == "" {
-			return nil, fmt.Errorf("%s", locale.T("deploy.art.err.image"))
-		}
 		if !needBuild {
 			return []string{img}, nil
 		}
@@ -163,11 +163,11 @@ func runRemoteArtifactBuilds(client *ssh.Client, projectRoot, remoteRoot string,
 	needBuild := EffectiveDeployPush(cfg) || opts.Build
 	multi := cfg.DeployImages
 
+	if !cfg.HasDeployImageOrImages() {
+		return nil, fmt.Errorf("%s", locale.T("deploy.art.err.image"))
+	}
 	if len(multi) == 0 {
 		img := strings.TrimSpace(cfg.DeployImage)
-		if img == "" {
-			return nil, fmt.Errorf("%s", locale.T("deploy.art.err.image"))
-		}
 		if !needBuild {
 			return []string{img}, nil
 		}

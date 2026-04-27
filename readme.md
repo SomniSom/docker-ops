@@ -111,7 +111,7 @@ Minimal set (snake_case in YAML):
 | Compose | `compose_project_name`, `compose_file`, `compose_service` |
 | Remote | `remote_ssh`, `remote_path`, `ssh_identity` |
 | Sync | `exclude` list (global); options equivalent to legacy `rsync_extra` map to internal sync |
-| Deploy | `deploy_mode` (`source` or `artifacts`), `deploy_image` (single built image), optional `deploy_images` (map: compose service name → image ref for multiple `build:` services), optional `deploy_build_remote` (artifacts: run `docker build` / `docker push` on the server after mirroring the tree, instead of the local engine), `deploy_push`, `deploy_use_registry`, `deploy_save_load`, `deploy_save_compress` |
+| Deploy | `deploy_mode` (`source` or `artifacts`), `deploy_image` (single built image), optional `deploy_images` (YAML map: service name → image ref for multiple `build:` services), optional `deploy_build_remote` (artifacts: `docker build` / `docker push` on the server after mirroring the tree), `deploy_push`, `deploy_use_registry`, `deploy_save_load`, `deploy_save_compress`. **Env:** `DEPLOY_IMAGE`, and **`DEPLOY_IMAGES=svc=ref,svc2=ref2`** in **`dq.env` or process env** (same format; overrides YAML `deploy_images` when set — **§14.1**). |
 | Extra paths | `deploy_include` — relative to project root |
 | Application | `**app_config**` (or equivalent): **optional** path to app config for copying in `artifacts` and for `config-check`; if unset — **check/copy not required** (often no file exists) |
 | UX | `help_show_effective` and others as needed |
@@ -132,7 +132,7 @@ Minimal set (snake_case in YAML):
 **`deploy`:**
 
 - **`source`:** directory on server, tree sync with exclude, copy **app_config** when configured and file exists, then remote `reup`.
-- **`artifacts`:** when **`deploy_push: true`** or **`dq deploy --build`**, images are built with **`docker build`** — by default on **this machine**, then save/load or registry as configured. With **`deploy_build_remote: true`** (only with **`deploy_mode: artifacts`**, e.g. **`DEPLOY_BUILD_REMOTE=1`**) the tree is **mirrored over SFTP** (like `source`, honoring **`exclude`**) and **`docker build`** / **registry `docker push`** (when not save/load) run **on the server**; local Docker is not required for the build. Registry vs save/load; deliver `docker-compose.image.yml`, **app_config** if set, `deploy_include`; on the server: `config-check` (if applicable) → `up` or `pull`+`up`. **The `dq` binary is not copied to the server.** Draft `docker-compose.image.yml`: **`dq gen-image-compose`**. For several built services, **`deploy_images`** and **`dq gen-image-compose --all-built`**; if **`deploy_images` is empty**, the single-**`deploy_image`** flow applies.
+- **`artifacts`:** when **`deploy_push: true`** or **`dq deploy --build`**, images are built with **`docker build`** — by default on **this machine**, then save/load or registry as configured. With **`deploy_build_remote: true`** (only with **`deploy_mode: artifacts`**, e.g. **`DEPLOY_BUILD_REMOTE=1`**) the tree is **mirrored over SFTP** (like `source`, honoring **`exclude`**) and **`docker build`** / **registry `docker push`** (when not save/load) run **on the server**; local Docker is not required for the build. The same **image tags** apply: **`deploy_image`**, or **`deploy_images`** in YAML, or **`DEPLOY_IMAGES=…`** in env — including when resolving **which** `docker build -t …` and push commands run (locally or on the server). Registry vs save/load; deliver `docker-compose.image.yml`, **app_config** if set, `deploy_include`; on the server: `config-check` (if applicable) → `up` or `pull`+`up`. **The `dq` binary is not copied to the server.** Draft `docker-compose.image.yml`: **`dq gen-image-compose`**. For several built services, **`deploy_images`** / **`DEPLOY_IMAGES`** and **`dq gen-image-compose --all-built`**; if no multi-image config, the single-**`deploy_image`** (or `DEPLOY_IMAGE`) flow applies.
 - **Data on server (`artifacts`):** by default the whole `remote_path` **project** tree is **not** fully mirrored (only the compose, image delivery, and configured paths) — extra dirs (e.g. **`db-data`**) are **not** removed unless in **`deploy_include`**. If you use **`deploy_build_remote`**, a **full** mirror to `remote_path` runs for the build (see **`exclude`**). In all cases, ensure **`docker-compose.image.yml`** uses the same volume path for DB data, etc. **`source`** can delete server-only extras during sync — riskier for a live DB inside the project tree.
 
 ### 5.4 `env` command (template)
@@ -152,10 +152,10 @@ Minimal set (snake_case in YAML):
 ## 7. Build and distribution
 
 - Go module: **`github.com/SomniSom/docker-ops`** (repo: https://github.com/SomniSom/docker-ops). Install from source: `go install github.com/SomniSom/docker-ops/cmd/dq@latest`.
-- `go build -o dq` / `make build` — see **Makefile** (`VERSION`, `GIT_COMMIT`, ldflags → `internal/version`).
+- **`dq version` and the product number:** a **release build** (GitHub **Releases** asset, or your own `go build` / `make` with **`-ldflags`**) sets **`v1.1.0`**, **`v1.1.2`**, etc. — a single line like `Docker Quick-ops v1.1.2 (a1b2c3d)`. A plain **`go install ...@latest`** (or `@v1.1.2`) embeds the **Go module pseudo-version** (e.g. `v1.0.1-0.20260407201612-08053888e894`), which comes from the **module graph**, not the human marketing tag. That is expected; `dq version` may print a second **Note** line in that case. To align the string with a git tag, use: **`make build VERSION=$(git describe --tags --always)`** or a **prebuilt** archive from Releases (GoReleaser sets **`-X .../version.Version={{.Version}}`** to **`v1.1.2`** for that tag build).
+- `go build` / `make build` / `make install` — see **Makefile** (`VERSION`, `GIT_COMMIT`, ldflags → `internal/version`).
 - **OS/arch matrix:** **GitHub Actions** (`.github/workflows/ci.yml`) — tests on Linux / macOS / Windows and cross-build `linux|darwin|windows` × `amd64|arm64`.
-- **GoReleaser** (`.goreleaser.yaml`): same targets, archives (`tar.gz` / `zip` on Windows), **`checksums.txt`**. Locally: `make goreleaser-check`, snapshot without release: `make goreleaser-snapshot` ([goreleaser](https://goreleaser.com/install/) required). GitHub release: tag **`v*`** → **`.github/workflows/release.yml`**.
-- `dq version` (git tag + commit).
+- **GoReleaser** (`.goreleaser.yaml`): same targets, archives (`tar.gz` / `zip` on Windows), **`checksums.txt`**, injects **release** semver into the binary. Locally: `make goreleaser-check`, snapshot: `make goreleaser-snapshot` ([goreleaser](https://goreleaser.com/install/) required). Pushing a git tag **`v*`** runs **`.github/workflows/release.yml`** and publishes a **GitHub** release; that is the usual way to get a binary whose `dq version` shows **exactly** the tag.
 - man — `make gen-man` / `make install-man` (**§4.6**).
 
 ---
@@ -218,7 +218,7 @@ For each parameter (YAML key, logical env var name), order is **weaker → stron
 2. `**dq.env**` — secrets file; **overrides** matching parameters from YAML (same key in either file; if both exist, **`dq.env` wins**).
 3. **Process environment** (CI/CD, `export`, systemd) — **highest**; overrides YAML and `dq.env`.
 
-Parameters only in YAML and absent from `dq.env` and process env come from YAML. Empty or missing lines in `dq.env` should not wipe YAML without an explicit rule in code (recommendation: treat empty as “unset” and do not override YAML).
+Parameters only in YAML and absent from `dq.env` and process env come from YAML. Empty or missing lines in `dq.env` should not wipe YAML without an explicit rule in code (recommendation: treat empty as “unset” and do not override YAML). **`DEPLOY_IMAGES=app=ghcr.io/ns/a:1,worker=ghcr.io/ns/w:1`** in `dq.env` or the process environment replaces the **`deploy_images`** map from YAML when non-empty (same as other `DEPLOY_*` overrides; see list in `internal/config/overlay.go`).
 
 ### 14.2 Remote Docker API and SSH socket
 

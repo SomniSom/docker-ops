@@ -25,6 +25,11 @@ func applyDQEnvMap(c *Config, m map[string]string) {
 	set("RSYNC_EXTRA", &c.RsyncExtra)
 	set("DEPLOY_MODE", &c.DeployMode)
 	set("DEPLOY_IMAGE", &c.DeployImage)
+	if v, ok := m["DEPLOY_IMAGES"]; ok && strings.TrimSpace(v) != "" {
+		if im := ParseDeployImagesList(v); len(im) > 0 {
+			c.DeployImages = im
+		}
+	}
 	set("APP_CONFIG", &c.AppConfig)
 
 	if v, ok := m["DEPLOY_PUSH"]; ok {
@@ -88,6 +93,11 @@ func overlayProcessEnv(c *Config) {
 	set("RSYNC_EXTRA", &c.RsyncExtra)
 	set("DEPLOY_MODE", &c.DeployMode)
 	set("DEPLOY_IMAGE", &c.DeployImage)
+	if v := os.Getenv("DEPLOY_IMAGES"); v != "" {
+		if im := ParseDeployImagesList(v); len(im) > 0 {
+			c.DeployImages = im
+		}
+	}
 	set("APP_CONFIG", &c.AppConfig)
 
 	if v := os.Getenv("DEPLOY_PUSH"); v != "" {

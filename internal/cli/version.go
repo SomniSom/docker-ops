@@ -15,7 +15,11 @@ func newVersionCmd() *cobra.Command {
 		Use:   "version",
 		Short: locale.T("version.short"),
 		Run: func(cmd *cobra.Command, args []string) {
-			fmt.Fprintf(cmd.OutOrStdout(), "%s %s (%s)\n", version.Name, version.Version, version.Commit)
+			out := cmd.OutOrStdout()
+			fmt.Fprintf(out, "%s %s (%s)\n", version.Name, version.Version, version.Commit)
+			if version.ShowModuleVersionNote() {
+				fmt.Fprintln(out, locale.T("version.hint_not_release"))
+			}
 		},
 	}
 }
