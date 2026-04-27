@@ -62,3 +62,17 @@ func TestArtifactsBuildAndPushMatrix(t *testing.T) {
 		})
 	}
 }
+
+func TestDeployBuildRemote(t *testing.T) {
+	f, tr := false, true
+	cfg := &config.Config{DeployPush: &tr, DeployBuildRemote: &tr}
+	if !DeployBuildRemote(cfg, RunOpts{}) {
+		t.Fatal("want true when deploy_push and deploy_build_remote")
+	}
+	if DeployBuildRemote(&config.Config{DeployBuildRemote: &f}, RunOpts{Build: true}) {
+		t.Fatal("want false when deploy_build_remote false")
+	}
+	if !DeployBuildRemote(&config.Config{DeployBuildRemote: &tr}, RunOpts{Build: true}) {
+		t.Fatal("want true with only --build and deploy_build_remote")
+	}
+}

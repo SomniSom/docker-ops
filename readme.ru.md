@@ -114,7 +114,7 @@
 | Compose    | `compose_project_name`, `compose_file`, `compose_service`                                                                                                                                                                               |
 | Remote     | `remote_ssh`, `remote_path`, `ssh_identity`                                                                                                                                                                                             |
 | Sync       | список `exclude` (глобальный); опции, эквивалентные нынешнему `rsync_extra`, — маппинг на внутренний sync                                                                                                                               |
-| Deploy     | `deploy_mode` (`source` или `artifacts`), `deploy_image` (один собираемый образ), опционально `deploy_images` (мапа: имя сервиса в compose → ref образа для нескольких `build:`), `deploy_push`, `deploy_use_registry`, `deploy_save_load`, `deploy_save_compress` |
+| Deploy     | `deploy_mode` (`source` или `artifacts`), `deploy_image` (один собираемый образ), опционально `deploy_images` (мапа: имя сервиса в compose → ref образа для нескольких `build:`), опционально `deploy_build_remote` (artifacts: `docker build` / `docker push` на сервере после зеркалирования дерева, вместо локального демона), `deploy_push`, `deploy_use_registry`, `deploy_save_load`, `deploy_save_compress` |
 | Доп. пути  | `deploy_include` — относительно корня проекта                                                                                                                                                                                           |
 | Приложение | `**app_config`** (или аналог): **опциональный** путь к файлу конфигурации приложения для копирования в `artifacts` и для `config-check`; если не задан — **проверка/копирование не обязательны** (в частых случаях файла может не быть) |
 | UX         | `help_show_effective` и др. по необходимости                                                                                                                                                                                            |
@@ -132,14 +132,14 @@
 | `build`, `pull`, `up`, `down`, `reup`, `ps`, `restart` | `docker compose …`                                                                 | SSH + `docker compose …` в `remote_path` |
 | `status`                                               | ps + хвост логов                                                                   | то же по SSH                             |
 | `logs`, `logs-tail`, `exec`                            | follow / tail / `exec -it` в терминале                                            | SSH; PTY для follow и интерактивного `exec` |
-| `deploy`                                               | SFTP sync + локальный `docker` при `artifacts`; требуется настроенный remote      | `source` или `artifacts`                 |
+| `deploy`                                               | `source`: зеркалирование по SFTP. `artifacts`: по умолчанию локальный `docker` (сборка) + загрузка; при **`deploy_build_remote`:** зеркалирование, затем **`docker build`** (и push, если не save/load) **на сервере** — локальный Docker для сборки не нужен. Требуется настроенный remote | `source` или `artifacts`                 |
 
 
 `**deploy`:**
 
 - `**source`:** каталог на сервере, sync дерева с exclude, копирование **app_config** при настройке и наличии файла, затем удалённый `reup`.
-- `**artifacts`:** опционально локальный `docker build` (`deploy_push: true` в конфиге или **`dq deploy --build`** без обязательного `deploy_push`); registry vs save/load; доставка `docker-compose.image.yml`, **app_config** если задан, `deploy_include`; на сервере по SSH: `config-check` (если применимо) → `up` или `pull`+`up`. **Бинарник `dq` на сервер не копируется.** Черновик `docker-compose.image.yml` из обычного compose: **`dq gen-image-compose`** (один сервис с `build:` и `deploy_image`, остальные только `image:`). Несколько собираемых сервисов: **`deploy_images`** и **`dq gen-image-compose --all-built`** — у каждого сервиса свой тег образа; **`deploy`/`--build`** собирает каждый контекст и сохраняет или пушит все образы. Если **`deploy_images` не задан или пуст**, поведение как раньше — только **`deploy_image`**.
-- **Данные на сервере (`artifacts`):** зеркалирования всего каталога `remote_path` **нет** — не удаляются произвольные файлы и папки (в т.ч. **`db-data`** с PostgreSQL), пока вы сами не перечислите их в **`deploy_include`** и не перезапишете с локальной машины. Убедитесь, что в **`docker-compose.image.yml`** том/путь к данным БД тот же (`./db-data:/var/lib/postgresql/data` и т.п.); обычный **`docker compose up`** не стирает bind-mount каталог на хосте. Режим **`source`** ведёт себя иначе (sync с удалением «лишнего» на сервере) — для живой БД в дереве проекта он опаснее.
+- `**artifacts`:** при **`deploy_push: true`** или **`dq deploy --build`** образы собираются через **`docker build`** — по умолчанию **на этой машине**, затем save/load или registry. С **`deploy_build_remote: true`** (только при **`deploy_mode: artifacts`**, напр. **`DEPLOY_BUILD_REMOTE=1`**) дерево **зеркалируется по SFTP** (как в `source`, с учётом **`exclude`**), а **`docker build`** и **registry-`docker push`** (если не save/load) выполняются **на сервере**; локальный Docker для сборки не нужен. Доставка `docker-compose.image.yml`, **app_config** если задан, `deploy_include`; на сервере: `config-check` (если применимо) → `up` или `pull`+`up`. **Бинарник `dq` на сервер не копируется.** Черновик `docker-compose.image.yml`: **`dq gen-image-compose`**. Несколько сервисов: **`deploy_images`** и **`dq gen-image-compose --all-built`**; при пустом **`deploy_images`** — сценарий с одним **`deploy_image`**.
+- **Данные на сервере (`artifacts`):** по умолчанию **полного** зеркалирования дерева в `remote_path` **нет** (только compose, передача образа и пути из конфига) — лишние каталоги (например **`db-data`**) **не** удаляются, пока не заданы в **`deploy_include`**. С **`deploy_build_remote`** перед сборкой выполняется **полное** зеркалирование (см. **`exclude`**). Проверьте тома в **`docker-compose.image.yml`**. Режим **`source`** может удалять на сервере «лишнее» относительно локальной копии — осторожнее с живой БД в дереве проекта.
 
 ### 5.4 Команда `env` (шаблон)
 
@@ -255,7 +255,7 @@
 - [x] `docker-ops.yaml` / `docker-ops.yml` только в корне проекта
 - [x] `dq.env` и приоритет слияния **§14.1** (YAML → dq.env → env процесса)
 - [x] Дефолты `compose_project_name` (имя каталога), `compose_file`, `compose_service`
-- [x] Команда `dq validate` (YAML, `deploy_mode`, `app_config` на диске, синтаксис `dq.env`)
+- [x] Команда `dq validate` (YAML, `deploy_mode`, `app_config` на диске, `deploy_build_remote` требует `deploy_mode: artifacts`, синтаксис `dq.env`)
 - [x] Понятные сообщения при синтаксической ошибке YAML (контекст строк, подсказки про отступы)
 - [x] Команда `dq env` (`--output`, `--force`, `--anonymize`)
 - [ ] Расширенная семантическая валидация (например все поля deploy, ssh_identity существует)
@@ -278,7 +278,7 @@
 ### Деплой
 
 - [x] **`deploy` в режиме `source`:** SFTP-синхронизация дерева, exclude-лист, `deploy_include`, опционально `app_config`, затем удалённый `reup`
-- [x] **`deploy` в режиме `artifacts`:** `docker build`, ветка registry vs `save`/`load`, доставка `docker-compose.image.yml` и файлов, удалённый `pull`+`up` или только `up`
+- [x] **`deploy` в режиме `artifacts`:** `docker build` (локально или с **`deploy_build_remote`** на сервере), ветка registry vs `save`/`load`, доставка `docker-compose.image.yml` и файлов, удалённый `pull`+`up` или только `up`
 - [ ] Маппинг `rsync_extra` → опции встроенного sync (если остаётся в ТЗ)
 
 ### Docker помимо `docker compose` CLI

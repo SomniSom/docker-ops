@@ -79,7 +79,7 @@ var knownRootYAMLKeys = []string{
 	"remote_ssh", "remote_path", "ssh_identity",
 	"exclude", "rsync_extra",
 	"deploy_mode", "deploy_image", "deploy_push",
-	"deploy_use_registry", "deploy_save_load", "deploy_save_compress",
+	"deploy_use_registry", "deploy_save_load", "deploy_save_compress", "deploy_build_remote",
 	"deploy_include", "app_config", "help_show_effective", "use_remote",
 }
 

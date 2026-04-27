@@ -57,6 +57,8 @@ compose_service: %s
 # # deploy_images:
 # #   app: ghcr.io/you/app:1.0.0
 # #   worker: ghcr.io/you/worker:1.0.0
+# # Build on the server (SFTP mirror + remote docker build) instead of local Docker:
+# # deploy_build_remote: true
 # deploy_push: true
 
 # Extra paths relative to project root (deploy_include):

@@ -111,7 +111,7 @@ Minimal set (snake_case in YAML):
 | Compose | `compose_project_name`, `compose_file`, `compose_service` |
 | Remote | `remote_ssh`, `remote_path`, `ssh_identity` |
 | Sync | `exclude` list (global); options equivalent to legacy `rsync_extra` map to internal sync |
-| Deploy | `deploy_mode` (`source` or `artifacts`), `deploy_image` (single built image), optional `deploy_images` (map: compose service name → image ref for multiple `build:` services), `deploy_push`, `deploy_use_registry`, `deploy_save_load`, `deploy_save_compress` |
+| Deploy | `deploy_mode` (`source` or `artifacts`), `deploy_image` (single built image), optional `deploy_images` (map: compose service name → image ref for multiple `build:` services), optional `deploy_build_remote` (artifacts: run `docker build` / `docker push` on the server after mirroring the tree, instead of the local engine), `deploy_push`, `deploy_use_registry`, `deploy_save_load`, `deploy_save_compress` |
 | Extra paths | `deploy_include` — relative to project root |
 | Application | `**app_config**` (or equivalent): **optional** path to app config for copying in `artifacts` and for `config-check`; if unset — **check/copy not required** (often no file exists) |
 | UX | `help_show_effective` and others as needed |
@@ -127,13 +127,13 @@ Minimal set (snake_case in YAML):
 | `build`, `pull`, `up`, `down`, `reup`, `ps`, `restart` | `docker compose …` | SSH + `docker compose …` in `remote_path` |
 | `status` | ps + log tail | same over SSH |
 | `logs`, `logs-tail`, `exec` | follow / tail / `exec -it` in terminal | SSH; PTY for follow and interactive `exec` |
-| `deploy` | SFTP sync + local `docker` for `artifacts`; needs configured remote | `source` or `artifacts` |
+| `deploy` | `source`: SFTP mirror. `artifacts`: by default local `docker` (build) + upload; with **`deploy_build_remote`:** SFTP mirror, then `docker build` (and push if not save/load) **on the server** — no local Docker required for the image build. Needs configured remote. | `source` or `artifacts` |
 
 **`deploy`:**
 
 - **`source`:** directory on server, tree sync with exclude, copy **app_config** when configured and file exists, then remote `reup`.
-- **`artifacts`:** optional local `docker build` (`deploy_push: true` in config or **`dq deploy --build`** without requiring `deploy_push`); registry vs save/load; deliver `docker-compose.image.yml`, **app_config** if set, `deploy_include`; on server over SSH: `config-check` (if applicable) → `up` or `pull`+`up`. **The `dq` binary is not copied to the server.** Draft `docker-compose.image.yml` from base compose: **`dq gen-image-compose`** (one service with `build:` and `deploy_image`, others `image:` only). For several built services, set **`deploy_images`** and use **`dq gen-image-compose --all-built`** so each service gets its own image tag; **`deploy`/`--build`** builds each context and saves or pushes all images. If **`deploy_images` is unset or empty**, behaviour matches the previous single-`deploy_image` flow.
-- **Data on server (`artifacts`):** the whole `remote_path` tree is **not** mirrored — arbitrary files and dirs (e.g. **`db-data`** for PostgreSQL) are **not** deleted unless you list them in **`deploy_include`** and overwrite from local. Ensure **`docker-compose.image.yml`** uses the same volume/path for DB data (`./db-data:/var/lib/postgresql/data`, etc.); plain **`docker compose up`** does not wipe a host bind-mount dir. **`source`** behaves differently (sync may delete extras on server) — riskier for a live DB inside the project tree.
+- **`artifacts`:** when **`deploy_push: true`** or **`dq deploy --build`**, images are built with **`docker build`** — by default on **this machine**, then save/load or registry as configured. With **`deploy_build_remote: true`** (only with **`deploy_mode: artifacts`**, e.g. **`DEPLOY_BUILD_REMOTE=1`**) the tree is **mirrored over SFTP** (like `source`, honoring **`exclude`**) and **`docker build`** / **registry `docker push`** (when not save/load) run **on the server**; local Docker is not required for the build. Registry vs save/load; deliver `docker-compose.image.yml`, **app_config** if set, `deploy_include`; on the server: `config-check` (if applicable) → `up` or `pull`+`up`. **The `dq` binary is not copied to the server.** Draft `docker-compose.image.yml`: **`dq gen-image-compose`**. For several built services, **`deploy_images`** and **`dq gen-image-compose --all-built`**; if **`deploy_images` is empty**, the single-**`deploy_image`** flow applies.
+- **Data on server (`artifacts`):** by default the whole `remote_path` **project** tree is **not** fully mirrored (only the compose, image delivery, and configured paths) — extra dirs (e.g. **`db-data`**) are **not** removed unless in **`deploy_include`**. If you use **`deploy_build_remote`**, a **full** mirror to `remote_path` runs for the build (see **`exclude`**). In all cases, ensure **`docker-compose.image.yml`** uses the same volume path for DB data, etc. **`source`** can delete server-only extras during sync — riskier for a live DB inside the project tree.
 
 ### 5.4 `env` command (template)
 
@@ -249,7 +249,7 @@ Legend: `[x]` done · `[ ]` not done / planned.
 - [x] `docker-ops.yaml` / `docker-ops.yml` only at project root
 - [x] `dq.env` and merge order **§14.1** (YAML → dq.env → process env)
 - [x] Defaults `compose_project_name` (directory name), `compose_file`, `compose_service`
-- [x] `dq validate` (YAML, `deploy_mode`, `app_config` on disk, `dq.env` syntax)
+- [x] `dq validate` (YAML, `deploy_mode`, `app_config` on disk, `deploy_build_remote` requires `deploy_mode: artifacts`, `dq.env` syntax)
 - [x] Clear errors on YAML syntax (line context, indentation hints)
 - [x] `dq env` (`--output`, `--force`, `--anonymize`)
 - [ ] Deeper semantic validation (e.g. all deploy fields, `ssh_identity` exists)
@@ -272,7 +272,7 @@ Legend: `[x]` done · `[ ]` not done / planned.
 ### Deploy
 
 - [x] **`deploy` in `source` mode:** SFTP tree sync, exclude list, `deploy_include`, optional `app_config`, remote `reup`
-- [x] **`deploy` in `artifacts` mode:** `docker build`, registry vs `save`/`load`, deliver `docker-compose.image.yml` and files, remote `pull`+`up` or `up`
+- [x] **`deploy` in `artifacts` mode:** `docker build` (local or with **`deploy_build_remote`** on the server), registry vs `save`/`load`, deliver `docker-compose.image.yml` and files, remote `pull`+`up` or `up`
 - [ ] Map `rsync_extra` → internal sync options (if still in spec)
 
 ### Docker beyond `docker compose` CLI
@@ -286,8 +286,6 @@ Legend: `[x]` done · `[ ]` not done / planned.
 - [x] `dq version` + Makefile ldflags
 - [x] **Man pages:** `dq man`, `make gen-man` / `make install-man` (**§4.6**)
 - [x] **GoReleaser** + CI OS/arch matrix, archives, checksums (**§7**, `.goreleaser.yaml`, `.github/workflows/`)
-- [ ] Short **WSL2** doc (**§6**)
-- [ ] Migration table old `docker-ops.remote.*` → `docker-ops.yaml` / `dq.env` (**§12**)
 
 ### Localization
 
