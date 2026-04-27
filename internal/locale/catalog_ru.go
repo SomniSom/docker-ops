@@ -25,7 +25,7 @@ var catalogRu = map[string]string{
 
 Source (по умолчанию): зеркалирование дерева с исключениями (размер/mtime), deploy_include, app_config, затем удалённый reup.
 
-Artifacts: нужен docker-compose.image.yml. Один образ: deploy_image. Несколько собираемых сервисов: deploy_images (имя сервиса → тег) и dq gen-image-compose --all-built с теми же тегами; каждый сервис собирается из своего build context в compose. Опционально docker build/push или save|ssh|load; затем удалённый pull+up или up. Флаг --build выполняет локальный docker build для каждого образа перед save/load (или push), даже если deploy_push не задан.`,
+Artifacts: нужен docker-compose.image.yml. Один образ: deploy_image. Несколько собираемых сервисов: deploy_images (имя сервиса → тег) и dq gen-image-compose --all-built с теми же тегами; каждый сервис собирается из своего build context в compose. Опционально docker build/push или save|ssh|load; затем удалённый pull+up или up. Флаг --build выполняет локальный docker build для каждого образа перед save/load (или push), даже если deploy_push не задан. С deploy_build_remote: true и сборкой (--build или deploy_push) дерево проекта зеркалируется по SFTP, а docker build (и push в registry, если не save/load) выполняется на удалённом хосте, а не локально.`,
 	"deploy.err.needs_remote": "для deploy нужны remote_ssh и remote_path (docker-ops.yml или dq.env); выполните «dq validate»",
 	"deploy.flag.build":       "artifacts: docker build -t deploy_image, затем save/load или push по настройкам",
 
@@ -95,6 +95,7 @@ Fish:
 
 	"validate.err.read_file": "чтение %s",
 	"validate.deploy_mode":        "deploy_mode должен быть «source», «artifacts» или пустым; получено %q",
+	"validate.deploy_build_remote_artifacts": "deploy_build_remote: true требует deploy_mode: artifacts",
 	"validate.app_config_missing": "app_config указывает на отсутствующий файл %q (полный путь: %s)",
 	"validate.err.dq_env": "dq.env",
 
@@ -153,6 +154,10 @@ Fish:
 	"deploy.art.build":        "==> docker build -t %s\n",
 	"deploy.art.build_svc":    "==> docker build -t %s (сервис %s)\n",
 	"deploy.art.push":         "==> docker push %s\n",
+	"deploy.art.mirror_remote": "==> зеркалирование дерева для удалённой сборки (SFTP)\n",
+	"deploy.art.build_remote":  "==> удалённо: docker build -t %s\n",
+	"deploy.art.build_remote_svc": "==> удалённо: docker build -t %s (сервис %s)\n",
+	"deploy.art.push_remote":   "==> удалённо: docker push %s\n",
 
 	"deploy.inc.skip_abs":    "dq: deploy_include: пропуск абсолютного пути %q\n",
 	"deploy.inc.skip_unsafe": "dq: deploy_include: пропуск небезопасного пути %q\n",

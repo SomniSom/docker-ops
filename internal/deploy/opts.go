@@ -48,3 +48,12 @@ func EffectiveSaveCompress(cfg *config.Config) bool {
 func EffectiveDeployPush(cfg *config.Config) bool {
 	return boolVal(cfg.DeployPush)
 }
+
+// DeployBuildRemote is true when deploy_build_remote is set and a build is requested
+// (same condition as runArtifactBuilds: deploy_push or CLI --build).
+func DeployBuildRemote(cfg *config.Config, opts RunOpts) bool {
+	if cfg == nil || cfg.DeployBuildRemote == nil || !*cfg.DeployBuildRemote {
+		return false
+	}
+	return EffectiveDeployPush(cfg) || opts.Build
+}

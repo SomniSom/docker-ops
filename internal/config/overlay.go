@@ -52,6 +52,11 @@ func applyDQEnvMap(c *Config, m map[string]string) {
 			c.DeploySaveCompress = boolPtr(b)
 		}
 	}
+	if v, ok := m["DEPLOY_BUILD_REMOTE"]; ok {
+		if b, ok := parseBoolString(v); ok {
+			c.DeployBuildRemote = boolPtr(b)
+		}
+	}
 	if v, ok := m["DOCKER_OPS_USE_REMOTE"]; ok {
 		if b, ok := parseBoolString(v); ok {
 			c.UseRemote = boolPtr(b)
@@ -108,6 +113,11 @@ func overlayProcessEnv(c *Config) {
 	if v := os.Getenv("DEPLOY_SAVE_COMPRESS"); v != "" {
 		if b, ok := parseBoolString(v); ok {
 			c.DeploySaveCompress = boolPtr(b)
+		}
+	}
+	if v := os.Getenv("DEPLOY_BUILD_REMOTE"); v != "" {
+		if b, ok := parseBoolString(v); ok {
+			c.DeployBuildRemote = boolPtr(b)
 		}
 	}
 	if v := os.Getenv("DOCKER_OPS_USE_REMOTE"); v != "" {

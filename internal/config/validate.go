@@ -28,6 +28,9 @@ func ValidateBytes(label string, content []byte) error {
 	if err := validateDeployMode(&cfg); err != nil {
 		return err
 	}
+	if err := validateDeployBuildRemote(&cfg); err != nil {
+		return err
+	}
 	root := filepath.Dir(label)
 	if err := validateAppConfigPath(&cfg, root); err != nil {
 		return err
@@ -39,6 +42,17 @@ func validateDeployMode(cfg *Config) error {
 	dm := strings.TrimSpace(strings.ToLower(cfg.DeployMode))
 	if dm != "" && dm != "source" && dm != "artifacts" {
 		return fmt.Errorf("%s", locale.Tf("validate.deploy_mode", cfg.DeployMode))
+	}
+	return nil
+}
+
+func validateDeployBuildRemote(cfg *Config) error {
+	if cfg == nil || cfg.DeployBuildRemote == nil || !*cfg.DeployBuildRemote {
+		return nil
+	}
+	dm := strings.TrimSpace(strings.ToLower(cfg.DeployMode))
+	if dm != "artifacts" {
+		return fmt.Errorf("%s", locale.T("validate.deploy_build_remote_artifacts"))
 	}
 	return nil
 }

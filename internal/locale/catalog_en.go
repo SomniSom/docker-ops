@@ -26,7 +26,7 @@ and that app_config exists on disk if set.`,
 
 Source (default): mirror project tree with excludes (size/mtime), deploy_include, app_config, then remote reup.
 
-Artifacts: requires docker-compose.image.yml. Single image: deploy_image. Multiple built services: deploy_images (map service name → image tag) and dq gen-image-compose --all-built with matching deploy_images; each service is docker built from its compose build context. Optional docker build/push or save|ssh|load; then remote pull+up or up. Flag --build runs local docker build for every image before save/load (or push) even if deploy_push is unset.`,
+Artifacts: requires docker-compose.image.yml. Single image: deploy_image. Multiple built services: deploy_images (map service name → image tag) and dq gen-image-compose --all-built with matching deploy_images; each service is docker built from its compose build context. Optional docker build/push or save|ssh|load; then remote pull+up or up. Flag --build runs local docker build for every image before save/load (or push) even if deploy_push is unset. With deploy_build_remote: true and a build (--build or deploy_push), the project tree is mirrored over SFTP and docker build (and registry push when not save/load) runs on the remote host instead of locally.`,
 	"deploy.err.needs_remote": "deploy needs remote_ssh and remote_path (docker-ops.yml or dq.env); run 'dq validate' to check the file",
 	"deploy.flag.build":       "artifacts: docker build -t deploy_image, then save/load or push as configured",
 
@@ -96,6 +96,7 @@ Fish:
 
 	"validate.err.read_file": "read %s",
 	"validate.deploy_mode":         "deploy_mode must be \"source\", \"artifacts\", or empty; got %q",
+	"validate.deploy_build_remote_artifacts": "deploy_build_remote: true requires deploy_mode: artifacts",
 	"validate.app_config_missing": "app_config points to missing file %q (resolved: %s)",
 	"validate.err.dq_env": "dq.env",
 
@@ -154,6 +155,10 @@ Docker said: %s`,
 	"deploy.art.build":        "==> docker build -t %s\n",
 	"deploy.art.build_svc":    "==> docker build -t %s (service %s)\n",
 	"deploy.art.push":         "==> docker push %s\n",
+	"deploy.art.mirror_remote": "==> mirror project tree for remote build (SFTP)\n",
+	"deploy.art.build_remote":  "==> remote: docker build -t %s\n",
+	"deploy.art.build_remote_svc": "==> remote: docker build -t %s (service %s)\n",
+	"deploy.art.push_remote":   "==> remote: docker push %s\n",
 
 	"deploy.inc.skip_abs":    "dq: deploy_include: skip absolute path %q\n",
 	"deploy.inc.skip_unsafe": "dq: deploy_include: skip unsafe path %q\n",

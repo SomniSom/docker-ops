@@ -151,3 +151,80 @@ func dockerPushMulti(projectRoot string, images []string) error {
 	}
 	return nil
 }
+
+// runRemoteArtifactBuilds runs docker build on the remote host in paths under remoteRoot
+// that mirror the local project (after SFTP mirror). client must be connected.
+func runRemoteArtifactBuilds(client *ssh.Client, projectRoot, remoteRoot string, cfg *config.Config, opts RunOpts, baseCompose []byte) ([]string, error) {
+	if client == nil {
+		return nil, fmt.Errorf("remote build: no ssh client")
+	}
+	projectRoot = filepath.Clean(projectRoot)
+	remoteRoot = strings.TrimSpace(remoteRoot)
+	needBuild := EffectiveDeployPush(cfg) || opts.Build
+	multi := cfg.DeployImages
+
+	if len(multi) == 0 {
+		img := strings.TrimSpace(cfg.DeployImage)
+		if img == "" {
+			return nil, fmt.Errorf("%s", locale.T("deploy.art.err.image"))
+		}
+		if !needBuild {
+			return []string{img}, nil
+		}
+		rdir := remoteJoin(remoteRoot, ".")
+		fmt.Fprint(os.Stderr, locale.Tf("deploy.art.build_remote", img))
+		script := "cd " + sshexec.ShellQuote(rdir) + " && docker " + sshexec.QuoteArgs([]string{"build", "-t", img, "."})
+		if err := sshexec.RunBash(client, script, false); err != nil {
+			return nil, fmt.Errorf("%s: %w", locale.T("deploy.art.docker_build"), err)
+		}
+		return []string{img}, nil
+	}
+
+	ctxs, err := composeimage.ServiceBuildDirs(baseCompose, projectRoot)
+	if err != nil {
+		return nil, err
+	}
+	keys := sortedDeployImageKeys(multi)
+	if len(keys) == 0 {
+		return nil, fmt.Errorf("%s", locale.T("deploy.art.err.images_empty"))
+	}
+	var refs []string
+	for _, svc := range keys {
+		imgRef := strings.TrimSpace(multi[svc])
+		ctxDir, ok := ctxs[svc]
+		if !ok {
+			return nil, fmt.Errorf("%s", locale.Tf("deploy.art.err.no_build_service", svc, cfg.ComposeFile))
+		}
+		if !needBuild {
+			refs = append(refs, imgRef)
+			continue
+		}
+		rel, err := filepath.Rel(projectRoot, ctxDir)
+		if err != nil {
+			return nil, err
+		}
+		rel = filepath.ToSlash(filepath.Clean(rel))
+		rdir := remoteJoin(remoteRoot, rel)
+		fmt.Fprint(os.Stderr, locale.Tf("deploy.art.build_remote_svc", imgRef, svc))
+		script := "cd " + sshexec.ShellQuote(rdir) + " && docker " + sshexec.QuoteArgs([]string{"build", "-t", imgRef, "."})
+		if err := sshexec.RunBash(client, script, false); err != nil {
+			return nil, fmt.Errorf("%s: %w", locale.T("deploy.art.docker_build"), err)
+		}
+		refs = append(refs, imgRef)
+	}
+	return refs, nil
+}
+
+func dockerPushMultiRemote(client *ssh.Client, images []string) error {
+	if client == nil {
+		return fmt.Errorf("remote push: no ssh client")
+	}
+	for _, img := range images {
+		fmt.Fprint(os.Stderr, locale.Tf("deploy.art.push_remote", img))
+		script := "docker " + sshexec.QuoteArgs([]string{"push", img})
+		if err := sshexec.RunBash(client, script, false); err != nil {
+			return fmt.Errorf("%s: %w", locale.T("deploy.art.docker_push"), err)
+		}
+	}
+	return nil
+}

@@ -25,7 +25,10 @@ type Config struct {
 	DeployUseRegistry  *bool    `yaml:"deploy_use_registry"`
 	DeploySaveLoad     *bool    `yaml:"deploy_save_load"`
 	DeploySaveCompress *bool    `yaml:"deploy_save_compress"`
-	DeployInclude      []string `yaml:"deploy_include"`
+	// DeployBuildRemote runs docker build (and registry push when not save/load) on the
+	// remote host after mirroring the project tree, instead of using the local Docker daemon.
+	DeployBuildRemote *bool `yaml:"deploy_build_remote"`
+	DeployInclude     []string `yaml:"deploy_include"`
 	AppConfig          string   `yaml:"app_config"`
 	HelpShowEffective  *bool    `yaml:"help_show_effective"`
 	UseRemote          *bool    `yaml:"use_remote"` // false => force local (DOCKER_OPS_USE_REMOTE=0)
