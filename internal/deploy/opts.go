@@ -8,10 +8,7 @@ import (
 
 // ModeIsArtifacts reports deploy_mode == artifacts (case-insensitive).
 func ModeIsArtifacts(cfg *config.Config) bool {
-	if cfg == nil {
-		return false
-	}
-	return strings.EqualFold(strings.TrimSpace(cfg.DeployMode), "artifacts")
+	return config.ModeIsArtifacts(cfg)
 }
 
 func boolVal(p *bool) bool {

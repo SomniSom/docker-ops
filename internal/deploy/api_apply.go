@@ -44,7 +44,7 @@ func ApplyArtifactsStack(ctx context.Context, remote *dockerapi.Client, cfg *con
 	applyImageRefs(cfg, project)
 	for _, name := range sortedServiceNames(project) {
 		svc := project.Services[name]
-		if err := applyService(ctx, remote, cfg, project, name, svc); err != nil {
+		if err := applyService(ctx, remote, cfg, project, composeFile, name, svc); err != nil {
 			return err
 		}
 	}
@@ -82,15 +82,26 @@ func applyImageRefs(cfg *config.Config, p *types.Project) {
 	}
 }
 
-func applyService(ctx context.Context, remote *dockerapi.Client, cfg *config.Config, project *types.Project, name string, svc types.ServiceConfig) error {
+func applyService(ctx context.Context, remote *dockerapi.Client, cfg *config.Config, project *types.Project, composeFile, name string, svc types.ServiceConfig) error {
 	if strings.TrimSpace(svc.Image) == "" {
 		return fmt.Errorf("%s", locale.Tf("deploy.api.err.no_image", name))
 	}
 	projectName := cfg.ComposeProjectName
+	workingDir := project.WorkingDir
+	if rp := strings.TrimSpace(cfg.RemotePath); cfg.RemoteConfigured() && rp != "" {
+		workingDir = rp
+	}
+	configFiles := filepath.Base(composeFile)
+	if configFiles == "" {
+		configFiles = config.ArtifactsComposeFileName
+	}
 	labels := map[string]string{
-		"com.docker.compose.project": projectName,
-		"com.docker.compose.service": name,
-		"com.docker.compose.oneoff":  "False",
+		"com.docker.compose.project":              projectName,
+		"com.docker.compose.service":              name,
+		"com.docker.compose.oneoff":               "False",
+		"com.docker.compose.container-number":   "1",
+		"com.docker.compose.project.config_files": configFiles,
+		"com.docker.compose.project.working_dir":  workingDir,
 	}
 	for k, v := range svc.Labels {
 		labels[k] = v
@@ -118,9 +129,9 @@ func applyService(ctx context.Context, remote *dockerapi.Client, cfg *config.Con
 		_ = remote.Moby().ContainerStop(ctx, existing, container.StopOptions{Timeout: &timeout})
 		_ = remote.Moby().ContainerRemove(ctx, existing, container.RemoveOptions{Force: true})
 	}
-	createName := name
-	if svc.ContainerName != "" {
-		createName = svc.ContainerName
+	createName := svc.ContainerName
+	if createName == "" {
+		createName = fmt.Sprintf("%s-%s-1", projectName, name)
 	}
 	resp, err := remote.Moby().ContainerCreate(ctx, containerConfig, hostConfig, networking, nil, createName)
 	if err != nil {

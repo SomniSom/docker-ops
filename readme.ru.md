@@ -3,7 +3,7 @@
 **Язык:** русский · [English (primary readme)](readme.md)
 
 **Статус:** реализация на Go (черновик ТЗ в этом файле).  
-**Исполняемый CLI:** бинарник `**dq`** в репозитории; Bash/Python-обвязка удалена.
+**Исполняемый CLI:** бинарник `**dq**`.
 
 **Полное название продукта:** **Docker Quick-ops** (бинарник: `dq`).
 
@@ -11,11 +11,7 @@
 
 ## 1. Обоснование и цели
 
-### 1.1 Проблема (исторически)
-
-- Прежний стек на **Bash**, **rsync/ssh/scp** и **Python** для YAML давал расхождения между окружениями.
-
-### 1.2 Цель
+### 1.1 Цель
 
 **Один статически собираемый бинарник `dq`**, который:
 
@@ -26,7 +22,7 @@
 - передачей файлов по **SSH из Go** (без обязательного `rsync`/`scp` на машине пользователя);
 - **кросс-компиляцией** под основные ОС и архитектуры (linux/windows/darwin, amd64/arm64 и т.д.).
 
-### 1.3 Нефункциональные ожидания
+### 1.2 Нефункциональные ожидания
 
 - **Самодостаточность рантайма**: без Python и без обязательного `rsync` на клиенте.
 - Предсказуемое поведение и понятные сообщения об ошибках.
@@ -79,7 +75,8 @@
 ### 4.4 Взаимодействие с Docker
 
 - **По умолчанию:** **`docker compose`** (плагин **Compose V2**). `docker-compose` V1 не поддерживается. Локально и **на удалённом хосте через SSH** (`dq` на сервер **не устанавливается**).
-- **Opt-in (artifacts):** **Docker Engine HTTP API** через **`docker.sock`** на сервере. Доступ: **SSH streamlocal-туннель** (см. **§14.2**); `remote_docker_socket: auto` определяет путь. **`deploy_engine`**: `compose` (default), `auto`, `api`.
+- **Opt-in (artifacts):** **Docker Engine HTTP API** через **`docker.sock`** на сервере. Доступ: **SSH streamlocal-туннель** (см. **§12.2**); `remote_docker_socket: auto` определяет путь. **`deploy_engine`**: `compose` (default), `auto`, `api`.
+- **Операционные команды** (`ps`, `up`, `down`, `logs`, `exec`, …) всегда идут через **`docker compose`** (локально или по SSH), не через Docker API. При **`deploy_mode: artifacts`** `dq` автоматически берёт **`docker-compose.image.yml`**, если файл есть в корне проекта — тот же compose, что доставляется при деплое и используется API apply — поэтому `ps`/`logs`/… видят контейнеры независимо от **`deploy_engine`**.
 - **Оптимизации** (при доступном API-туннеле): **`deploy_skip_unchanged`**, **`deploy_layer_sync`** (fallback на полный save/load).
 - Справочник для операторов и AI: **[docs/ai-operator.md](docs/ai-operator.md)**, **[AGENTS.md](AGENTS.md)**.
 
@@ -103,7 +100,7 @@
 
 - Корень проекта: **текущий рабочий каталог**; опционально флаг `--project-dir` / переменная `**DQ_PROJECT_ROOT`**.
 - Загрузка `docker-ops.yaml` | `docker-ops.yml` + при наличии `dq.env`.
-- Приоритет настроек: **§14.1**.
+- Приоритет настроек: **§12.1**.
 
 ### 5.2 Поля конфигурации
 
@@ -115,7 +112,7 @@
 | Compose    | `compose_project_name`, `compose_file`, `compose_service`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | Remote     | `remote_ssh`, `remote_path`, `ssh_identity`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | Sync       | список `exclude` (глобальный); опции, эквивалентные нынешнему `rsync_extra`, — маппинг на внутренний sync                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
-| Deploy     | `deploy_mode` (`source` или `artifacts`), `deploy_image` (один собираемый образ), опционально `deploy_images` (в YAML: мапа сервис → ref образа для нескольких `build:`), опционально `deploy_build_remote` (artifacts: `docker build` / `docker push` на сервере после зеркалирования дерева), `deploy_push`, `deploy_use_registry`, `deploy_save_load`, `deploy_save_compress`. **Переменные окружения:** `DEPLOY_IMAGE` и `**DEPLOY_IMAGES=сервис=тег,сервис2=тег2`** в `**dq.env` или в env процесса** (тот же формат; непустое значение подменяет `deploy_images` из YAML — **§14.1**). |
+| Deploy     | `deploy_mode` (`source` или `artifacts`), `deploy_image` (один собираемый образ), опционально `deploy_images` (в YAML: мапа сервис → ref образа для нескольких `build:`), опционально `deploy_build_remote` (artifacts: `docker build` / `docker push` на сервере после зеркалирования дерева), `deploy_push`, `deploy_use_registry`, `deploy_save_load`, `deploy_save_compress`. **Переменные окружения:** `DEPLOY_IMAGE` и `**DEPLOY_IMAGES=сервис=тег,сервис2=тег2`** в `**dq.env` или в env процесса** (тот же формат; непустое значение подменяет `deploy_images` из YAML — **§12.1**). |
 | Доп. пути  | `deploy_include` — относительно корня проекта                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | Приложение | `**app_config`** (или аналог): **опциональный** путь к файлу конфигурации приложения для копирования в `artifacts` и для `config-check`; если не задан — **проверка/копирование не обязательны** (в частых случаях файла может не быть)                                                                                                                                                                                                                                                                                                                                                      |
 | UX         | `help_show_effective` и др. по необходимости                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
@@ -189,35 +186,21 @@
 
 ---
 
-## 11. Совместимость с прежними именами файлов
-
-- Старые имена (`**docker-ops.remote.yaml`**, `**docker-ops.remote.env`** и т.п.) не поддерживаются: только `**docker-ops.yaml` / `docker-ops.yml**` + `**dq.env**`. Миграция — вручную по документации.
-
----
-
-## 12. Миграция с прежней Bash-версии
-
-- Соответствие полей старых `docker-ops.remote.*` / переменных окружения → `docker-ops.yaml` + `dq.env` — задокументировать (таблица в roadmap).
-- Автоматической миграции **нет** (при желании — отдельно).
-- Bash/Python-скрипты из репозитория **удалены**; используйте только `dq`.
-
----
-
-## 13. Критерии приёмки (черновик)
+## 11. Критерии приёмки (черновик)
 
 - Все команды из §5.3 в локальном режиме на Linux с установленным Docker.
 - Удалённый режим без `dq` на сервере: e2e `deploy` (`source` и `artifacts` с save/load) по SSH.
 - Нет зависимости от Python и обязательного `rsync` на клиенте; sync по SFTP + size/mtime.
-- Конфиг только в корне: `docker-ops.yaml` | `docker-ops.yml`; секреты в `dq.env`; приоритет слияния — **§14.1**.
+- Конфиг только в корне: `docker-ops.yaml` | `docker-ops.yml`; секреты в `dq.env`; приоритет слияния — **§12.1**.
 - `dq completion bash|zsh` и man согласно §4.6.
 - Локализация: en по умолчанию, ru при русской локали / `DQ_LANG` / `--lang` (**§8**).
 - Сценарий пользователя на **WSL2** задокументирован и проверен по возможности.
 
 ---
 
-## 14. Принятые решения (уточнения)
+## 12. Принятые решения (уточнения)
 
-### 14.1 Приоритет конфигурации и `dq.env`
+### 12.1 Приоритет конфигурации и `dq.env`
 
 Для каждого параметра (ключ в YAML, логическое имя переменной окружения) действует порядок **от более слабого к более сильному** (более сильный перекрывает более слабый):
 
@@ -227,11 +210,11 @@
 
 Параметры, заданные **только** в YAML и отсутствующие в `dq.env` и в env процесса, берутся из YAML. Пустая или отсутствующая строка в `dq.env` не должна затирать значение из YAML без явной договорённости в коде (рекомендация: пустое значение трактовать как «не задано» и не переопределять YAML).
 
-### 14.2 Удалённый Docker API и SSH-сокет
+### 12.2 Удалённый Docker API и SSH-сокет
 
 Доступ к Docker на удалённом хосте для будущей интеграции с API: **через SSH к сокету Docker на сервере** (типично Unix-domain socket `/var/run/docker.sock`). Реализация на стороне `dq`: установить **SSH-туннель** (или эквивалент в используемой SSH-библиотеке), чтобы на машине пользователя появился локальный endpoint (Unix-socket или `127.0.0.1:порт`), указывающий на удалённый Docker; клиент API Docker подключается к этому endpoint. Отдельное открытие Docker daemon в интернет **не требуется**.
 
-### 14.3 Лицензия
+### 12.3 Лицензия
 
 Используется **Apache License, Version 2.0**; полный текст — в файле `**LICENSE`** в корне репозитория.
 
@@ -240,7 +223,6 @@
 ## Реализация (Go)
 
 - Исходники: `cmd/dq`, `internal/config`, `internal/cli`, `internal/compose`, `internal/deploy`, `internal/sshexec`, `internal/remote`, `internal/version`, `tools/genman`.
-- Отдельных Bash/Python-скриптов в репозитории **нет** (раньше — `scripts/`).
 - Сборка: `make build` → `bin/dq`; `make install` — через `go install`.
 - Тесты: `make test` / `make test-unit` (`-race`); `make test-integration` — `-tags=integration` (нужен Docker с плагином **Compose V2**).
 - Подробный статус по пунктам — в **Roadmap** ниже.
@@ -254,7 +236,7 @@
 ### Конфигурация и валидация
 
 - `docker-ops.yaml` / `docker-ops.yml` только в корне проекта
-- `dq.env` и приоритет слияния **§14.1** (YAML → dq.env → env процесса)
+- `dq.env` и приоритет слияния **§12.1** (YAML → dq.env → env процесса)
 - Дефолты `compose_project_name` (имя каталога), `compose_file`, `compose_service`
 - Команда `dq validate` (YAML, `deploy_mode`, `app_config` на диске, `deploy_build_remote` требует `deploy_mode: artifacts`, синтаксис `dq.env`)
 - Понятные сообщения при синтаксической ошибке YAML (контекст строк, подсказки про отступы)
@@ -285,7 +267,7 @@
 ### Docker помимо `docker compose` CLI
 
 - [x] **docker.sock** / API для transfer и apply (**§4.4**)
-- [x] Удалённый Docker API через **SSH-туннель** (**§14.2**); `remote_docker_socket: auto`
+- [x] Удалённый Docker API через **SSH-туннель** (**§12.2**); `remote_docker_socket: auto`
 - [x] **Hash skip** и **layer sync** с fallback на CLI
 - [x] Документация: [docs/ai-operator.md](docs/ai-operator.md), [AGENTS.md](AGENTS.md)
 
@@ -296,7 +278,6 @@
 - **man-страницы**: `dq man`, `make gen-man` / `make install-man` (**§4.6**)
 - **GoReleaser** + CI-матрица OS/arch, архивы, checksums (**§7**, `.goreleaser.yaml`, `.github/workflows/`)
 - Краткая документация по **WSL2** (**§6**)
-- Таблица миграции полей старых `docker-ops.remote.*` → `docker-ops.yaml` / `dq.env` (**§12**)
 
 ### Локализация
 

@@ -24,9 +24,9 @@ func RunArtifacts(projectRoot string, cfg *config.Config, opts RunOpts) error {
 		return fmt.Errorf("%s", locale.T("err.remote_not_configured"))
 	}
 	projectRoot = filepath.Clean(projectRoot)
-	composeLocal := filepath.Join(projectRoot, artifactsComposeFile)
+	composeLocal := filepath.Join(projectRoot, config.ArtifactsComposeFileName)
 	if st, err := os.Stat(composeLocal); err != nil || st.IsDir() {
-		return fmt.Errorf("%s", locale.Tf("deploy.art.err.compose", artifactsComposeFile))
+		return fmt.Errorf("%s", locale.Tf("deploy.art.err.compose", config.ArtifactsComposeFileName))
 	}
 
 	baseComposePath := filepath.Join(projectRoot, cfg.ComposeFile)
@@ -75,7 +75,7 @@ func RunArtifacts(projectRoot string, cfg *config.Config, opts RunOpts) error {
 		return fmt.Errorf("%s: %w", locale.T("deploy.src.sftp"), err)
 	}
 
-	remCompose := remoteJoin(rp, artifactsComposeFile)
+	remCompose := remoteJoin(rp, config.ArtifactsComposeFileName)
 	if err := putLocalFile(c, composeLocal, remCompose); err != nil {
 		_ = c.Close()
 		return fmt.Errorf("%s: %w", locale.T("deploy.art.upload"), err)
@@ -104,10 +104,8 @@ func RunArtifacts(projectRoot string, cfg *config.Config, opts RunOpts) error {
 		return err
 	}
 	exportDeployImage := strings.Contains(string(composeBytes), "${DEPLOY_IMAGE}")
-	return RunArtifactsFinish(ctx, client, cfg, artifactsComposeFile, skipPull, exportDeployImage, composeLocal, projectRoot, remoteSess)
+	return RunArtifactsFinish(ctx, client, cfg, config.ArtifactsComposeFileName, skipPull, exportDeployImage, composeLocal, projectRoot, remoteSess)
 }
-
-const artifactsComposeFile = "docker-compose.image.yml"
 
 func putLocalFile(c *sftp.Client, localPath, rem string) error {
 	st, err := os.Stat(localPath)
@@ -198,7 +196,7 @@ func runArtifactsRemoteBuild(projectRoot string, cfg *config.Config, opts RunOpt
 		_ = c.Close()
 		return err
 	}
-	remCompose := remoteJoin(rp, artifactsComposeFile)
+	remCompose := remoteJoin(rp, config.ArtifactsComposeFileName)
 	if err := putLocalFile(c, composeLocal, remCompose); err != nil {
 		_ = c.Close()
 		return fmt.Errorf("%s: %w", locale.T("deploy.art.upload"), err)
@@ -242,5 +240,5 @@ func runArtifactsRemoteBuild(projectRoot string, cfg *config.Config, opts RunOpt
 		return err
 	}
 	exportDeployImage := strings.Contains(string(composeBytes), "${DEPLOY_IMAGE}")
-	return RunArtifactsFinish(ctx, client, cfg, artifactsComposeFile, skipPull, exportDeployImage, composeLocal, projectRoot, remoteSess)
+	return RunArtifactsFinish(ctx, client, cfg, config.ArtifactsComposeFileName, skipPull, exportDeployImage, composeLocal, projectRoot, remoteSess)
 }

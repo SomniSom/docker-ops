@@ -12,7 +12,7 @@ import (
 )
 
 // RunDockerCompose runs `docker compose` in cfg.RemotePath on the remote host.
-func RunDockerCompose(cfg *config.Config, tty bool, composeArgs ...string) error {
+func RunDockerCompose(cfg *config.Config, projectRoot string, tty bool, composeArgs ...string) error {
 	if cfg == nil || !cfg.RemoteConfigured() {
 		return errors.New(locale.T("err.remote_ssh"))
 	}
@@ -21,11 +21,11 @@ func RunDockerCompose(cfg *config.Config, tty bool, composeArgs ...string) error
 		return err
 	}
 	defer client.Close()
-	return RunDockerComposeClient(client, cfg, "", tty, false, composeArgs...)
+	return RunDockerComposeClient(client, cfg, projectRoot, "", tty, false, composeArgs...)
 }
 
 // RunDockerComposeInteractive runs docker compose over SSH for dq exec -it: raw local stdin + SIGINT forwarded to the server.
-func RunDockerComposeInteractive(cfg *config.Config, composeArgs ...string) error {
+func RunDockerComposeInteractive(cfg *config.Config, projectRoot string, composeArgs ...string) error {
 	if cfg == nil || !cfg.RemoteConfigured() {
 		return errors.New(locale.T("err.remote_ssh"))
 	}
@@ -34,13 +34,14 @@ func RunDockerComposeInteractive(cfg *config.Config, composeArgs ...string) erro
 		return err
 	}
 	defer client.Close()
-	return RunDockerComposeClient(client, cfg, "", true, true, composeArgs...)
+	return RunDockerComposeClient(client, cfg, projectRoot, "", true, true, composeArgs...)
 }
 
 // RunDockerComposeClient runs `docker compose` using an existing SSH client (same session as SFTP deploy).
-// If composeFileOverride is non-empty, it is passed as -f instead of cfg.ComposeFile.
+// projectRoot is the local project directory used to resolve EffectiveComposeFile when composeFileOverride is empty.
+// If composeFileOverride is non-empty, it is passed as -f instead of the effective compose file.
 // rawLocalStdin should be true only for interactive exec (dq exec bash): Ctrl+D and signals behave correctly.
-func RunDockerComposeClient(client *ssh.Client, cfg *config.Config, composeFileOverride string, tty, rawLocalStdin bool, composeArgs ...string) error {
+func RunDockerComposeClient(client *ssh.Client, cfg *config.Config, projectRoot, composeFileOverride string, tty, rawLocalStdin bool, composeArgs ...string) error {
 	if client == nil || cfg == nil || !cfg.RemoteConfigured() {
 		return errors.New(locale.T("err.remote_ssh"))
 	}
@@ -48,7 +49,7 @@ func RunDockerComposeClient(client *ssh.Client, cfg *config.Config, composeFileO
 	if rp == "" {
 		return errors.New(locale.T("err.remote_ssh"))
 	}
-	cf := cfg.ComposeFile
+	cf := config.EffectiveComposeFile(cfg, projectRoot)
 	if strings.TrimSpace(composeFileOverride) != "" {
 		cf = strings.TrimSpace(composeFileOverride)
 	}

@@ -3,7 +3,7 @@
 **Language:** English · [Русский](readme.ru.md)
 
 **Status:** Go implementation (draft specification in this file).  
-**CLI binary:** the **`dq`** executable in this repository; the Bash/Python wrapper has been removed.
+**CLI binary:** the **`dq`** executable.
 
 **Full product name:** **Docker Quick-ops** (binary: `dq`).
 
@@ -11,11 +11,7 @@
 
 ## 1. Rationale and goals
 
-### 1.1 Problem (historically)
-
-- The previous stack based on **Bash**, **rsync/ssh/scp**, and **Python** for YAML led to drift between environments.
-
-### 1.2 Goal
+### 1.1 Goal
 
 **A single statically linkable `dq` binary** that:
 
@@ -26,7 +22,7 @@
 - transfers files over **SSH from Go** without requiring `rsync`/`scp` on the user machine;
 - supports **cross-compilation** for major OS/arch combinations (linux/windows/darwin, amd64/arm64, etc.).
 
-### 1.3 Non-functional expectations
+### 1.2 Non-functional expectations
 
 - **Runtime self-sufficiency:** no Python and no mandatory `rsync` on the client.
 - Predictable behaviour and clear error messages.
@@ -77,7 +73,8 @@
 ### 4.4 Docker interaction
 
 - **Default:** **`docker compose`** (**Compose V2** plugin). Standalone **`docker-compose` (V1) is not supported**. Same locally and **on the remote host over SSH** (`dq` is **not installed on the server**).
-- **Opt-in (artifacts):** **Docker Engine HTTP API** via **`docker.sock`** on the remote host. Access: **SSH streamlocal tunnel** to the socket (see **§14.2**); `remote_docker_socket: auto` detects path (`DOCKER_HOST`, docker context, systemd, probe). Config: **`deploy_engine`**: `compose` (default), `auto` (API + compose fallback), `api` (API finish only).
+- **Opt-in (artifacts):** **Docker Engine HTTP API** via **`docker.sock`** on the remote host. Access: **SSH streamlocal tunnel** to the socket (see **§12.2**); `remote_docker_socket: auto` detects path (`DOCKER_HOST`, docker context, systemd, probe). Config: **`deploy_engine`**: `compose` (default), `auto` (API + compose fallback), `api` (API finish only).
+- **Operational commands** (`ps`, `up`, `down`, `logs`, `exec`, …) always use **`docker compose`** (locally or over SSH), not the Docker API. In **`deploy_mode: artifacts`**, `dq` automatically uses **`docker-compose.image.yml`** when that file exists in the project root — the same file delivered on deploy and used by API apply — so compose ops match containers regardless of **`deploy_engine`**.
 - **Optimizations (when API tunnel available):** **`deploy_skip_unchanged`** — skip image transfer if digest matches; **`deploy_layer_sync`** — partial layer tar in save/load mode (fallback: full save).
 - Operator / AI guide: **[docs/ai-operator.md](docs/ai-operator.md)**, **[AGENTS.md](AGENTS.md)**.
 
@@ -101,7 +98,7 @@
 
 - Project root: **current working directory**; optional `--project-dir` / `**DQ_PROJECT_ROOT**`.
 - Load `docker-ops.yaml` | `docker-ops.yml` + `dq.env` when present.
-- Setting precedence: **§14.1**.
+- Setting precedence: **§12.1**.
 
 ### 5.2 Configuration fields
 
@@ -112,7 +109,7 @@ Minimal set (snake_case in YAML):
 | Compose | `compose_project_name`, `compose_file`, `compose_service` |
 | Remote | `remote_ssh`, `remote_path`, `ssh_identity` |
 | Sync | `exclude` list (global); options equivalent to legacy `rsync_extra` map to internal sync |
-| Deploy | `deploy_mode` (`source` or `artifacts`), `deploy_image` (single built image), optional `deploy_images` (YAML map: service name → image ref for multiple `build:` services), optional `deploy_build_remote` (artifacts: `docker build` / `docker push` on the server after mirroring the tree), `deploy_push`, `deploy_use_registry`, `deploy_save_load`, `deploy_save_compress`. **Env:** `DEPLOY_IMAGE`, and **`DEPLOY_IMAGES=svc=ref,svc2=ref2`** in **`dq.env` or process env** (same format; overrides YAML `deploy_images` when set — **§14.1**). |
+| Deploy | `deploy_mode` (`source` or `artifacts`), `deploy_image` (single built image), optional `deploy_images` (YAML map: service name → image ref for multiple `build:` services), optional `deploy_build_remote` (artifacts: `docker build` / `docker push` on the server after mirroring the tree), `deploy_push`, `deploy_use_registry`, `deploy_save_load`, `deploy_save_compress`. **Env:** `DEPLOY_IMAGE`, and **`DEPLOY_IMAGES=svc=ref,svc2=ref2`** in **`dq.env` or process env** (same format; overrides YAML `deploy_images` when set — **§12.1**). |
 | Extra paths | `deploy_include` — relative to project root |
 | Application | `**app_config**` (or equivalent): **optional** path to app config for copying in `artifacts` and for `config-check`; if unset — **check/copy not required** (often no file exists) |
 | UX | `help_show_effective` and others as needed |
@@ -183,35 +180,21 @@ Minimal set (snake_case in YAML):
 
 ---
 
-## 11. Legacy file names
-
-- Old names (`**docker-ops.remote.yaml**`, `**docker-ops.remote.env**`, etc.) are **not** supported: only `**docker-ops.yaml` / `docker-ops.yml**` + `**dq.env**`. Migrate manually per docs.
-
----
-
-## 12. Migration from the Bash version
-
-- Mapping old `docker-ops.remote.*` / env vars → `docker-ops.yaml` + `dq.env` — document in roadmap table.
-- **No** automatic migration (optional tool separately).
-- Bash/Python scripts **removed** from the repo; use **`dq`** only.
-
----
-
-## 13. Acceptance criteria (draft)
+## 11. Acceptance criteria (draft)
 
 - All commands from §5.3 in local mode on Linux with Docker installed.
 - Remote mode without `dq` on server: e2e `deploy` (`source` and `artifacts` with save/load) over SSH.
 - No Python or mandatory `rsync` on client; sync via SFTP + size/mtime.
-- Config only at root: `docker-ops.yaml` | `docker-ops.yml`; secrets in `dq.env`; merge order **§14.1**.
+- Config only at root: `docker-ops.yaml` | `docker-ops.yml`; secrets in `dq.env`; merge order **§12.1**.
 - `dq completion bash|zsh` and man per §4.6.
 - Localization: en default, ru for Russian locale / `DQ_LANG` / `--lang` (**§8**).
 - WSL2 user scenario documented and verified where possible.
 
 ---
 
-## 14. Decisions (clarifications)
+## 12. Decisions (clarifications)
 
-### 14.1 Configuration precedence and `dq.env`
+### 12.1 Configuration precedence and `dq.env`
 
 For each parameter (YAML key, logical env var name), order is **weaker → stronger** (stronger overrides):
 
@@ -221,11 +204,11 @@ For each parameter (YAML key, logical env var name), order is **weaker → stron
 
 Parameters only in YAML and absent from `dq.env` and process env come from YAML. Empty or missing lines in `dq.env` should not wipe YAML without an explicit rule in code (recommendation: treat empty as “unset” and do not override YAML). **`DEPLOY_IMAGES=app=ghcr.io/ns/a:1,worker=ghcr.io/ns/w:1`** in `dq.env` or the process environment replaces the **`deploy_images`** map from YAML when non-empty (same as other `DEPLOY_*` overrides; see list in `internal/config/overlay.go`).
 
-### 14.2 Remote Docker API and SSH socket
+### 12.2 Remote Docker API and SSH socket
 
 Future Docker API access on remote hosts: **via SSH to the Docker socket** on the server (typically Unix socket `/var/run/docker.sock`). `dq` should establish an **SSH tunnel** (or library equivalent) so the user machine gets a local endpoint (Unix socket or `127.0.0.1:port`) pointing at remote Docker; API client talks to that endpoint. No need to expose the Docker daemon on the internet.
 
-### 14.3 License
+### 12.3 License
 
 **Apache License, Version 2.0**; full text in **`LICENSE`** at repo root.
 
@@ -234,7 +217,6 @@ Future Docker API access on remote hosts: **via SSH to the Docker socket** on th
 ## Implementation (Go)
 
 - Sources: `cmd/dq`, `internal/config`, `internal/cli`, `internal/compose`, `internal/deploy`, `internal/sshexec`, `internal/remote`, `internal/version`, `tools/genman`.
-- **No** Bash/Python scripts in the repo (formerly `scripts/`).
 - Build: `make build` → `bin/dq`; `make install` via `go install`.
 - Tests: `make test` / `make test-unit` (`-race`); `make test-integration` — `-tags=integration` (Docker with **Compose V2** plugin required).
 - Detailed status — **Roadmap** below.
@@ -248,7 +230,7 @@ Legend: `[x]` done · `[ ]` not done / planned.
 ### Configuration and validation
 
 - [x] `docker-ops.yaml` / `docker-ops.yml` only at project root
-- [x] `dq.env` and merge order **§14.1** (YAML → dq.env → process env)
+- [x] `dq.env` and merge order **§12.1** (YAML → dq.env → process env)
 - [x] Defaults `compose_project_name` (directory name), `compose_file`, `compose_service`
 - [x] `dq validate` (YAML, `deploy_mode`, `app_config` on disk, `deploy_build_remote` requires `deploy_mode: artifacts`, `dq.env` syntax)
 - [x] Clear errors on YAML syntax (line context, indentation hints)
@@ -279,7 +261,7 @@ Legend: `[x]` done · `[ ]` not done / planned.
 ### Docker beyond `docker compose` CLI
 
 - [x] Local **docker.sock** / API for deploy transfer & apply (**§4.4**)
-- [x] Remote Docker API via **SSH tunnel to socket** (**§14.2**); `remote_docker_socket: auto`
+- [x] Remote Docker API via **SSH tunnel to socket** (**§12.2**); `remote_docker_socket: auto`
 - [x] **Hash skip** (`deploy_skip_unchanged`) and **layer sync** (`deploy_layer_sync`) with CLI fallback
 - [x] **AI/operator docs:** [docs/ai-operator.md](docs/ai-operator.md), [AGENTS.md](AGENTS.md)
 

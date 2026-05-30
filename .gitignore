@@ -6,6 +6,7 @@
 coverage.out
 coverage.html
 dq.env
+.tool-versions
 .docker-ops-*
 .idea/
 .vscode/

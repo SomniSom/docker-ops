@@ -46,7 +46,7 @@ func newComposeSession(projectDir *string) (*composeSession, error) {
 	}
 	r := &compose.Runner{
 		ProjectRoot:        root,
-		ComposeFile:        cfg.ComposeFile,
+		ComposeFile:        config.EffectiveComposeFile(cfg, root),
 		ComposeProjectName: cfg.ComposeProjectName,
 	}
 	return &composeSession{cfg: cfg, localRoot: root, local: r}, nil
@@ -63,7 +63,7 @@ func (s *composeSession) Run(args ...string) error {
 	if s.local != nil {
 		return s.local.Run(args...)
 	}
-	return remote.RunDockerCompose(s.cfg, false, args...)
+	return remote.RunDockerCompose(s.cfg, s.localRoot, false, args...)
 }
 
 // RunTTY runs docker compose when the user needs terminal semantics: local runs use
@@ -73,7 +73,7 @@ func (s *composeSession) RunTTY(args ...string) error {
 	if s.local != nil {
 		return s.runLocalComposeTTY(args, false)
 	}
-	return remote.RunDockerCompose(s.cfg, true, args...)
+	return remote.RunDockerCompose(s.cfg, s.localRoot, true, args...)
 }
 
 // RunExecTTY runs docker compose exec -it (or the remote equivalent). Locally it puts
@@ -84,7 +84,7 @@ func (s *composeSession) RunExecTTY(args ...string) error {
 	if s.local != nil {
 		return s.runLocalComposeTTY(args, true)
 	}
-	return remote.RunDockerComposeInteractive(s.cfg, args...)
+	return remote.RunDockerComposeInteractive(s.cfg, s.localRoot, args...)
 }
 
 // runLocalComposeTTY starts docker compose as a child process with stderr teed for

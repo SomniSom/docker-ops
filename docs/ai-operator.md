@@ -19,7 +19,7 @@ This document complements [readme.md](../readme.md). Use it to choose deploy set
 
 `dq` does **not** replace full CI/CD or sign images (cosign etc.) in v1.
 
-## Config precedence (§14.1)
+## Config precedence (§12.1)
 
 Strongest wins:
 
@@ -146,6 +146,7 @@ deploy_push: true
 ## Footguns
 
 - **`source` + data on server** — mirror can remove server-only dirs.
+- **`compose_file` vs artifacts** — after `deploy_mode: artifacts`, set `compose_file: docker-compose.image.yml` or rely on auto-selection: `ps`/`up`/`logs` pick `docker-compose.image.yml` when present. API deploy labels containers for the same compose project.
 - **`go install` vs Releases** — `dq version` may show Go pseudo-version; use Release binary for marketing tag.
 - **Compose V2** — standalone `docker-compose` V1 is not supported.
 
