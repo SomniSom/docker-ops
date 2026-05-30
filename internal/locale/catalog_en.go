@@ -40,6 +40,9 @@ Default deploy_engine is compose (backward compatible). Set deploy_engine to aut
 	"stop.short":    "docker compose stop (containers kept; optional service names)",
 	"reup.short":    "docker compose build --pull && up -d",
 	"ps.short":      "docker compose ps",
+	"stats.short":   "docker compose stats (CPU/memory stream; DISK SIZE column with --no-stream)",
+	"stats.long":    "Live resource usage for project containers. Snapshot mode (--no-stream or non-TTY) adds a DISK SIZE column from docker ps -s (writable layer + virtual image size). Streaming mode prints disk sizes once, then live stats. Ctrl+C stops the stream.",
+	"stats.disk_header": "Container disk size (writable layer + virtual image):",
 	"restart.short": "docker compose restart <service>",
 	"restart.err":   "compose_service is empty and no service argument given",
 

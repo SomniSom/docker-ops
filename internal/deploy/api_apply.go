@@ -91,17 +91,26 @@ func applyService(ctx context.Context, remote *dockerapi.Client, cfg *config.Con
 	if rp := strings.TrimSpace(cfg.RemotePath); cfg.RemoteConfigured() && rp != "" {
 		workingDir = rp
 	}
-	configFiles := filepath.Base(composeFile)
-	if configFiles == "" {
-		configFiles = config.ArtifactsComposeFileName
+	configFiles := composeConfigFilesLabel(cfg, project.WorkingDir, composeFile)
+
+	img, _, err := remote.Moby().ImageInspectWithRaw(ctx, svc.Image)
+	if err != nil {
+		return fmt.Errorf("%s: %w", locale.Tf("deploy.api.err.no_image", name), err)
+	}
+	hash, err := serviceConfigHash(svc)
+	if err != nil {
+		return err
 	}
 	labels := map[string]string{
-		"com.docker.compose.project":              projectName,
-		"com.docker.compose.service":              name,
-		"com.docker.compose.oneoff":               "False",
-		"com.docker.compose.container-number":   "1",
-		"com.docker.compose.project.config_files": configFiles,
-		"com.docker.compose.project.working_dir":  workingDir,
+		"com.docker.compose.project":                 projectName,
+		"com.docker.compose.service":                 name,
+		"com.docker.compose.oneoff":                  "False",
+		"com.docker.compose.container-number":        "1",
+		"com.docker.compose.project.config_files":    configFiles,
+		"com.docker.compose.project.working_dir":     workingDir,
+		"com.docker.compose.config-hash":             hash,
+		"com.docker.compose.depends_on":              composeDependsOnLabel(svc),
+		"com.docker.compose.image":                   img.ID,
 	}
 	for k, v := range svc.Labels {
 		labels[k] = v
@@ -120,9 +129,17 @@ func applyService(ctx context.Context, remote *dockerapi.Client, cfg *config.Con
 	if err != nil {
 		return err
 	}
-	if existing != "" && containerUnchanged(ctx, remote, existing, containerConfig, hostConfig) {
-		fmt.Fprint(os.Stderr, locale.Tf("deploy.api.skip_unchanged", name))
-		return nil
+	if existing != "" {
+		missingComposeLabels := false
+		if insp, inspErr := remote.Moby().ContainerInspect(ctx, existing); inspErr == nil && insp.Config != nil {
+			if strings.TrimSpace(insp.Config.Labels["com.docker.compose.config-hash"]) == "" {
+				missingComposeLabels = true
+			}
+		}
+		if !missingComposeLabels && containerUnchanged(ctx, remote, existing, containerConfig, hostConfig) {
+			fmt.Fprint(os.Stderr, locale.Tf("deploy.api.skip_unchanged", name))
+			return nil
+		}
 	}
 	if existing != "" {
 		timeout := 10

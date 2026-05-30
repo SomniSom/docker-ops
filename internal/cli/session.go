@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"os/signal"
 	"path/filepath"
 	"sync"
@@ -64,6 +65,37 @@ func (s *composeSession) Run(args ...string) error {
 		return s.local.Run(args...)
 	}
 	return remote.RunDockerCompose(s.cfg, s.localRoot, false, args...)
+}
+
+// composeOutput runs docker compose and returns stdout (local or remote).
+func (s *composeSession) composeOutput(args ...string) ([]byte, error) {
+	if s.local != nil {
+		cmd := s.local.Command(args...)
+		var stdout, stderrBuf bytes.Buffer
+		cmd.Stdout = &stdout
+		cmd.Stderr = io.MultiWriter(os.Stderr, &stderrBuf)
+		if err := cmd.Run(); err != nil {
+			return stdout.Bytes(), compose.HintIfComposePluginError(stderrBuf.String(), fmt.Errorf("%s: %w", locale.T("compose.run_prefix"), err))
+		}
+		return stdout.Bytes(), nil
+	}
+	return remote.DockerComposeOutput(s.cfg, s.localRoot, args...)
+}
+
+// dockerOutput runs docker and returns stdout (local or remote).
+func (s *composeSession) dockerOutput(args ...string) ([]byte, error) {
+	if s.local != nil {
+		cmd := exec.Command("docker", args...)
+		cmd.Dir = s.localRoot
+		var stdout, stderrBuf bytes.Buffer
+		cmd.Stdout = &stdout
+		cmd.Stderr = io.MultiWriter(os.Stderr, &stderrBuf)
+		if err := cmd.Run(); err != nil {
+			return stdout.Bytes(), fmt.Errorf("%s: %w", locale.T("compose.run_prefix"), err)
+		}
+		return stdout.Bytes(), nil
+	}
+	return remote.DockerOutput(s.cfg, args...)
 }
 
 // RunTTY runs docker compose when the user needs terminal semantics: local runs use

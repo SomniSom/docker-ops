@@ -37,6 +37,9 @@ Artifacts: нужен docker-compose.image.yml. Один образ: deploy_imag
 	"stop.short":    "docker compose stop (контейнеры остаются; опционально имена сервисов)",
 	"reup.short":    "docker compose build --pull && up -d",
 	"ps.short":      "docker compose ps",
+	"stats.short":   "docker compose stats (поток CPU/памяти; колонка DISK SIZE с --no-stream)",
+	"stats.long":    "Статистика ресурсов контейнеров проекта. Снимок (--no-stream или не-TTY) добавляет колонку DISK SIZE из docker ps -s (слой записи + виртуальный размер образа). В потоковом режиме размеры выводятся один раз, затем live stats. Ctrl+C останавливает поток.",
+	"stats.disk_header": "Размер контейнера на диске (слой записи + виртуальный образ):",
 	"restart.short": "docker compose restart <сервис>",
 	"restart.err":   "compose_service пуст и сервис не указан в аргументах",
 

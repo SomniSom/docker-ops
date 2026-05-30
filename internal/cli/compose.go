@@ -52,6 +52,7 @@ func newComposeCmds(projectDir *string) []*cobra.Command {
 		newStopCmd(projectDir),
 		newReupCmd(projectDir),
 		newPsCmd(projectDir),
+		newStatsCmd(projectDir),
 		newRestartCmd(projectDir),
 		newExecCmd(projectDir),
 		newStatusCmd(projectDir),
@@ -170,9 +171,23 @@ func newReupCmd(projectDir *string) *cobra.Command {
 	}
 }
 
+// allowComposeFlags lets docker compose flags (-a, --no-stream, …) pass through to RunE.
+func allowComposeFlags(c *cobra.Command) {
+	c.FParseErrWhitelist = cobra.FParseErrWhitelist{UnknownFlags: true}
+}
+
+func statsNoStream(args []string) bool {
+	for _, a := range args {
+		if a == "--no-stream" || strings.HasPrefix(a, "--no-stream=") {
+			return true
+		}
+	}
+	return false
+}
+
 // newPsCmd creates "ps": docker compose ps plus extra args.
 func newPsCmd(projectDir *string) *cobra.Command {
-	return &cobra.Command{
+	c := &cobra.Command{
 		Use:   "ps",
 		Short: locale.T("ps.short"),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -183,6 +198,46 @@ func newPsCmd(projectDir *string) *cobra.Command {
 			return s.Run(append([]string{"ps"}, args...)...)
 		},
 	}
+	allowComposeFlags(c)
+	return c
+}
+
+// newStatsCmd creates "stats": docker compose stats (live stream or --no-stream).
+func newStatsCmd(projectDir *string) *cobra.Command {
+	c := &cobra.Command{
+		Use:   "stats [service...]",
+		Short: locale.T("stats.short"),
+		Long:  locale.T("stats.long"),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			s, err := newComposeSession(projectDir)
+			if err != nil {
+				return err
+			}
+			if statsUsesCustomFormat(args) {
+				base := append([]string{"stats"}, args...)
+				noStream := statsNoStream(args) || !term.IsTerminal(int(os.Stdout.Fd()))
+				if noStream {
+					if !statsNoStream(args) {
+						base = append(base, "--no-stream")
+					}
+					return s.Run(base...)
+				}
+				return runComposeFollow(s, base)
+			}
+			services, rest := splitLeadingServiceArgs(args)
+			all := statsIncludeAll(rest)
+			noStream := statsNoStream(args) || !term.IsTerminal(int(os.Stdout.Fd()))
+			if noStream {
+				return s.runStatsNoStreamWithSize(args)
+			}
+			if err := s.printStatsDiskHeader(services, all); err != nil {
+				return err
+			}
+			return runComposeFollow(s, append([]string{"stats"}, args...))
+		},
+	}
+	allowComposeFlags(c)
+	return c
 }
 
 // newRestartCmd creates "restart": service from first arg or compose_service in config,
@@ -306,21 +361,28 @@ func newLogsCmd(projectDir *string, tailOnly bool) *cobra.Command {
 			if !followTTY {
 				return s.Run(base...)
 			}
-			err = s.RunTTY(base...)
-			var sex *ssh.ExitError
-			if errors.As(err, &sex) {
-				if c := sex.ExitStatus(); c == 130 || c == 141 {
-					return nil
-				}
-			}
-			var ex *exec.ExitError
-			if errors.As(err, &ex) {
-				switch code := ex.ExitCode(); code {
-				case 130, 141, 137, 143: // interrupt, pipe, SIGKILL, SIGTERM — expected when stopping logs -f
-					return nil
-				}
-			}
+			err = runComposeFollow(s, base)
 			return err
 		},
 	}
+}
+
+// runComposeFollow runs docker compose with TTY semantics (logs -f, stats). Treats
+// user interrupt exit codes as success for local exec and SSH.
+func runComposeFollow(s *composeSession, args []string) error {
+	err := s.RunTTY(args...)
+	var sex *ssh.ExitError
+	if errors.As(err, &sex) {
+		if c := sex.ExitStatus(); c == 130 || c == 141 {
+			return nil
+		}
+	}
+	var ex *exec.ExitError
+	if errors.As(err, &ex) {
+		switch code := ex.ExitCode(); code {
+		case 130, 141, 137, 143:
+			return nil
+		}
+	}
+	return err
 }
