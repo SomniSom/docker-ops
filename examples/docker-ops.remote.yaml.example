@@ -20,6 +20,13 @@ remote_path: /opt/myapp
 # deploy_image: ghcr.io/you/myapp:1.0.0
 # deploy_push: true
 
+# --- Optional: Docker API deploy (opt-in; default deploy_engine=compose) ---
+# deploy_engine: auto          # auto | api | compose (default compose)
+# remote_docker_socket: auto   # auto-detect on server, or explicit path
+# remote_docker_socket_service: docker.socket
+# deploy_skip_unchanged: true
+# deploy_layer_sync: true
+
 # Дополнительные пути относительно корня проекта (deploy source и artifacts):
 # deploy_include:
 #   - assets

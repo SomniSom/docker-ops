@@ -80,6 +80,8 @@ var knownRootYAMLKeys = []string{
 	"exclude", "rsync_extra",
 	"deploy_mode", "deploy_image", "deploy_push",
 	"deploy_use_registry", "deploy_save_load", "deploy_save_compress", "deploy_build_remote",
+	"deploy_engine", "remote_docker_socket", "remote_docker_socket_service",
+	"deploy_skip_unchanged", "deploy_layer_sync",
 	"deploy_include", "app_config", "help_show_effective", "use_remote",
 }
 

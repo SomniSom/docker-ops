@@ -3,7 +3,7 @@
 **Язык:** русский · [English (primary readme)](readme.md)
 
 **Статус:** реализация на Go (черновик ТЗ в этом файле).  
-**Исполняемый CLI:** бинарник **`dq`** в репозитории; Bash/Python-обвязка удалена.
+**Исполняемый CLI:** бинарник `**dq`** в репозитории; Bash/Python-обвязка удалена.
 
 **Полное название продукта:** **Docker Quick-ops** (бинарник: `dq`).
 
@@ -78,9 +78,10 @@
 
 ### 4.4 Взаимодействие с Docker
 
-- **Сейчас:** только **`docker compose`** (плагин **Compose V2** для Docker CLI). Отдельный бинарь **`docker-compose` (V1) не поддерживается** — при отсутствии плагина `dq` выводит подсказку по установке (см. документацию Docker). Локально и **на удалённой машине через SSH** (команды выполняет shell на сервере, `dq` на сервер **не устанавливается**).
-- **Расширенные функции:** допускается работа через `**docker.sock`** (локальный API Docker).
-- **Планы:** интеграция с **HTTP API Docker** (в т.ч. для **удалённого** хоста). Доступ к API на сервере — через **SSH к сокету Docker** (`/var/run/docker.sock` на удалённой машине): проброс/туннель в рамках SSH-сессии (локальный Unix-socket или TCP-прокси на стороне клиента), без требования открывать Docker API в сеть. Детали транспорта — в реализации (см. **§14.2**).
+- **По умолчанию:** **`docker compose`** (плагин **Compose V2**). `docker-compose` V1 не поддерживается. Локально и **на удалённом хосте через SSH** (`dq` на сервер **не устанавливается**).
+- **Opt-in (artifacts):** **Docker Engine HTTP API** через **`docker.sock`** на сервере. Доступ: **SSH streamlocal-туннель** (см. **§14.2**); `remote_docker_socket: auto` определяет путь. **`deploy_engine`**: `compose` (default), `auto`, `api`.
+- **Оптимизации** (при доступном API-туннеле): **`deploy_skip_unchanged`**, **`deploy_layer_sync`** (fallback на полный save/load).
+- Справочник для операторов и AI: **[docs/ai-operator.md](docs/ai-operator.md)**, **[AGENTS.md](AGENTS.md)**.
 
 ### 4.5 Удалённое выполнение (без `dq` на сервере)
 
@@ -90,8 +91,8 @@
 ### 4.6 Cobra: shell completion и man
 
 - `dq completion bash|zsh|fish|powershell`.
-- **`dq man [подкоманда…]`** — man-страница из метаданных Cobra, просмотр через **`man -l`** (нужны **man-db** / **groff**). Без `man` в `PATH` в stdout выводится исходник troff.
-- Статическая генерация в каталог **`man/man1/`**: **`make gen-man`** (`go run ./tools/genman`); установка: **`make install-man`** (`MANPREFIX`, по умолчанию `/usr/local/share/man`).
+- `**dq man [подкоманда…]`** — man-страница из метаданных Cobra, просмотр через `**man -l**` (нужны **man-db** / **groff**). Без `man` в `PATH` в stdout выводится исходник troff.
+- Статическая генерация в каталог `**man/man1/`**: `**make gen-man**` (`go run ./tools/genman`); установка: `**make install-man**` (`MANPREFIX`, по умолчанию `/usr/local/share/man`).
 - Один источник правды: Cobra → `--help`, completion и man.
 
 ---
@@ -109,37 +110,37 @@
 Минимальный набор (snake_case в YAML):
 
 
-| Область    | Поля                                                                                                                                                                                                                                    |
-| ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Compose    | `compose_project_name`, `compose_file`, `compose_service`                                                                                                                                                                               |
-| Remote     | `remote_ssh`, `remote_path`, `ssh_identity`                                                                                                                                                                                             |
-| Sync       | список `exclude` (глобальный); опции, эквивалентные нынешнему `rsync_extra`, — маппинг на внутренний sync                                                                                                                               |
-| Deploy     | `deploy_mode` (`source` или `artifacts`), `deploy_image` (один собираемый образ), опционально `deploy_images` (в YAML: мапа сервис → ref образа для нескольких `build:`), опционально `deploy_build_remote` (artifacts: `docker build` / `docker push` на сервере после зеркалирования дерева), `deploy_push`, `deploy_use_registry`, `deploy_save_load`, `deploy_save_compress`. **Переменные окружения:** `DEPLOY_IMAGE` и **`DEPLOY_IMAGES=сервис=тег,сервис2=тег2`** в **`dq.env` или в env процесса** (тот же формат; непустое значение подменяет `deploy_images` из YAML — **§14.1**). |
-| Доп. пути  | `deploy_include` — относительно корня проекта                                                                                                                                                                                           |
-| Приложение | `**app_config`** (или аналог): **опциональный** путь к файлу конфигурации приложения для копирования в `artifacts` и для `config-check`; если не задан — **проверка/копирование не обязательны** (в частых случаях файла может не быть) |
-| UX         | `help_show_effective` и др. по необходимости                                                                                                                                                                                            |
+| Область    | Поля                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Compose    | `compose_project_name`, `compose_file`, `compose_service`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| Remote     | `remote_ssh`, `remote_path`, `ssh_identity`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| Sync       | список `exclude` (глобальный); опции, эквивалентные нынешнему `rsync_extra`, — маппинг на внутренний sync                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| Deploy     | `deploy_mode` (`source` или `artifacts`), `deploy_image` (один собираемый образ), опционально `deploy_images` (в YAML: мапа сервис → ref образа для нескольких `build:`), опционально `deploy_build_remote` (artifacts: `docker build` / `docker push` на сервере после зеркалирования дерева), `deploy_push`, `deploy_use_registry`, `deploy_save_load`, `deploy_save_compress`. **Переменные окружения:** `DEPLOY_IMAGE` и `**DEPLOY_IMAGES=сервис=тег,сервис2=тег2`** в `**dq.env` или в env процесса** (тот же формат; непустое значение подменяет `deploy_images` из YAML — **§14.1**). |
+| Доп. пути  | `deploy_include` — относительно корня проекта                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| Приложение | `**app_config`** (или аналог): **опциональный** путь к файлу конфигурации приложения для копирования в `artifacts` и для `config-check`; если не задан — **проверка/копирование не обязательны** (в частых случаях файла может не быть)                                                                                                                                                                                                                                                                                                                                                      |
+| UX         | `help_show_effective` и др. по необходимости                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 
 
 ### 5.3 Команды CLI
 
 
-| Команда                                                | Локально                                                                           | Удалённо                                 |
-| ------------------------------------------------------ | ---------------------------------------------------------------------------------- | ---------------------------------------- |
-| `help` / `--help`                                      | да                                                                                 | да                                       |
-| `man`                                                  | man-страницы из Cobra (`man -l`)                                                   | да                                       |
-| `env` (шаблон конфига)                                 | только локально                                                                    | не проксировать                          |
-| `config-check`                                         | если задан `app_config` — проверка файла; иначе no-op или информационное сообщение | то же по SSH                             |
-| `build`, `pull`, `up`, `down`, `reup`, `ps`, `restart` | `docker compose …`                                                                 | SSH + `docker compose …` в `remote_path` |
-| `status`                                               | ps + хвост логов                                                                   | то же по SSH                             |
-| `logs`, `logs-tail`, `exec`                            | follow / tail / `exec -it` в терминале                                            | SSH; PTY для follow и интерактивного `exec` |
-| `deploy`                                               | `source`: зеркалирование по SFTP. `artifacts`: по умолчанию локальный `docker` (сборка) + загрузка; при **`deploy_build_remote`:** зеркалирование, затем **`docker build`** (и push, если не save/load) **на сервере** — локальный Docker для сборки не нужен. Требуется настроенный remote | `source` или `artifacts`                 |
+| Команда                                                | Локально                                                                                                                                                                                                                                                                                    | Удалённо                                    |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------- |
+| `help` / `--help`                                      | да                                                                                                                                                                                                                                                                                          | да                                          |
+| `man`                                                  | man-страницы из Cobra (`man -l`)                                                                                                                                                                                                                                                            | да                                          |
+| `env` (шаблон конфига)                                 | только локально                                                                                                                                                                                                                                                                             | не проксировать                             |
+| `config-check`                                         | если задан `app_config` — проверка файла; иначе no-op или информационное сообщение                                                                                                                                                                                                          | то же по SSH                                |
+| `build`, `pull`, `up`, `down`, `reup`, `ps`, `restart` | `docker compose …`                                                                                                                                                                                                                                                                          | SSH + `docker compose …` в `remote_path`    |
+| `status`                                               | ps + хвост логов                                                                                                                                                                                                                                                                            | то же по SSH                                |
+| `logs`, `logs-tail`, `exec`                            | follow / tail / `exec -it` в терминале                                                                                                                                                                                                                                                      | SSH; PTY для follow и интерактивного `exec` |
+| `deploy`                                               | `source`: зеркалирование по SFTP. `artifacts`: по умолчанию локальный `docker` (сборка) + загрузка; при `**deploy_build_remote`:** зеркалирование, затем `**docker build`** (и push, если не save/load) **на сервере** — локальный Docker для сборки не нужен. Требуется настроенный remote | `source` или `artifacts`                    |
 
 
 `**deploy`:**
 
 - `**source`:** каталог на сервере, sync дерева с exclude, копирование **app_config** при настройке и наличии файла, затем удалённый `reup`.
-- `**artifacts`:** при **`deploy_push: true`** или **`dq deploy --build`** образы собираются через **`docker build`** — по умолчанию **на этой машине**, затем save/load или registry. С **`deploy_build_remote: true`** (только при **`deploy_mode: artifacts`**, напр. **`DEPLOY_BUILD_REMOTE=1`**) дерево **зеркалируется по SFTP** (как в `source`, с учётом **`exclude`**), а **`docker build`** и **registry-`docker push`** (если не save/load) выполняются **на сервере**; локальный Docker для сборки не нужен. **Те же теги образов**, что и в обычном `artifacts`: **`deploy_image`**, мапа **`deploy_images`**, или **`DEPLOY_IMAGES=…`** (в т.ч. на удалённой сборке, какой **`docker build -t`** / **`docker push`** выполнять). Доставка `docker-compose.image.yml`, **app_config** если задан, `deploy_include`; на сервере: `config-check` (если применимо) → `up` или `pull`+`up`. **Бинарник `dq` на сервер не копируется.** Черновик `docker-compose.image.yml`: **`dq gen-image-compose`**. Несколько сервисов: **`deploy_images`** / **`DEPLOY_IMAGES`** и **`dq gen-image-compose --all-built`**; иначе — сценарий с одним **`deploy_image`** / **`DEPLOY_IMAGE`**.
-- **Данные на сервере (`artifacts`):** по умолчанию **полного** зеркалирования дерева в `remote_path` **нет** (только compose, передача образа и пути из конфига) — лишние каталоги (например **`db-data`**) **не** удаляются, пока не заданы в **`deploy_include`**. С **`deploy_build_remote`** перед сборкой выполняется **полное** зеркалирование (см. **`exclude`**). Проверьте тома в **`docker-compose.image.yml`**. Режим **`source`** может удалять на сервере «лишнее» относительно локальной копии — осторожнее с живой БД в дереве проекта.
+- `**artifacts`:** при `**deploy_push: true`** или `**dq deploy --build**` образы собираются через `**docker build**` — по умолчанию **на этой машине**, затем save/load или registry. С `**deploy_build_remote: true`** (только при `**deploy_mode: artifacts**`, напр. `**DEPLOY_BUILD_REMOTE=1**`) дерево **зеркалируется по SFTP** (как в `source`, с учётом `**exclude`**), а `**docker build**` и **registry-`docker push`** (если не save/load) выполняются **на сервере**; локальный Docker для сборки не нужен. Доставка `docker-compose.image.yml`, **app_config** если задан, `deploy_include`; на сервере: `config-check` (если применимо) → `up` или `pull`+`up`. **Бинарник `dq` на сервер не копируется.** Черновик `docker-compose.image.yml`: `**dq gen-image-compose`**. Несколько сервисов: `**deploy_images**` и `**dq gen-image-compose --all-built**`; при пустом `**deploy_images**` — сценарий с одним `**deploy_image**`.
+- **Данные на сервере (`artifacts`):** по умолчанию **полного** зеркалирования дерева в `remote_path` **нет** (только compose, передача образа и пути из конфига) — лишние каталоги (например `**db-data`**) **не** удаляются, пока не заданы в `**deploy_include`**. С `**deploy_build_remote**` перед сборкой выполняется **полное** зеркалирование (см. `**exclude`**). Проверьте тома в `**docker-compose.image.yml**`. Режим `**source**` может удалять на сервере «лишнее» относительно локальной копии — осторожнее с живой БД в дереве проекта.
 
 ### 5.4 Команда `env` (шаблон)
 
@@ -157,11 +158,11 @@
 
 ## 7. Сборка и поставка
 
-- Модуль Go: **`github.com/SomniSom/docker-ops`** (репозиторий: https://github.com/SomniSom/docker-ops). Установка из исходников: `go install github.com/SomniSom/docker-ops/cmd/dq@latest`.
-- **Номер версии в `dq version`:** в **релизной** сборке (архив **GitHub Releases** или `go build` / `make` с **ldflags** через GoReleaser / Makefile) в бинарник вшивается **семантическая метка** вида **`v1.1.2`**, строка: `Docker Quick-ops v1.1.2 (хэш)`. Команда **`go install ...@latest`** (или **@v1.1.2**) подставляет **псевдо-версию модуля Go** (например `v1.0.1-0.20260407201612-08053888e894`) — она **не равна** тегу релиза в git в человеческом смысле; для Go это нормально. В таком случае `dq version` может вывести **доп. строку-подсказку** (`Note: …`). Чтобы в выводе совпадал **git tag**, пользуйтесь бинарником из **Releases** или соберите, например: **`make build VERSION=$(git describe --tags --always)`** (см. **Makefile** / **`.goreleaser.yaml`**; релизный пайплайн с тегом **`v*`** пишет в бинарник **ровно** этот тег).
-- `go build` / `make build` / `make install` — см. **Makefile** (`VERSION`, `GIT_COMMIT`, ldflags → `internal/version`).
+- Модуль Go: `**github.com/SomniSom/docker-ops`** (репозиторий: [https://github.com/SomniSom/docker-ops](https://github.com/SomniSom/docker-ops)). Установка из исходников: `go install github.com/SomniSom/docker-ops/cmd/dq@latest`.
+- `go build -o dq` / `make build` — см. **Makefile** (`VERSION`, `GIT_COMMIT`, ldflags → `internal/version`).
 - **Матрица OS/arch:** в **GitHub Actions** (`.github/workflows/ci.yml`) — тесты на Linux / macOS / Windows и кросс-сборка `linux|darwin|windows` × `amd64|arm64`.
-- **GoReleaser** (`.goreleaser.yaml`): в бинарник вшивается **тег** релиза, архивы, **`checksums.txt`**. Локально: `make goreleaser-check`, снимок: `make goreleaser-snapshot` (нужен [goreleaser](https://goreleaser.com/install/)). Пуш **git**-тега **`v*`** — workflow **`.github/workflows/release.yml`**, публикация на **GitHub Releases** (удобно для получения бинарника, где `dq version` = тег).
+- **GoReleaser** (`.goreleaser.yaml`): те же целевые платформы, архивы (`tar.gz` / `zip` для Windows), `**checksums.txt`**. Локально: `make goreleaser-check`, снимок без релиза: `make goreleaser-snapshot` (нужен установленный [goreleaser](https://goreleaser.com/install/)). Релиз на GitHub: тег `**v***` → workflow `**.github/workflows/release.yml**`.
+- `dq version` (git tag + commit).
 - man — `make gen-man` / `make install-man` (**§4.6**).
 
 ---
@@ -170,7 +171,7 @@
 
 - Язык интерфейса (сообщения, help подкоманд, тексты ошибок): **английский по умолчанию**.
 - Если в системе выбран **русский** (`LANGUAGE`, `LC_ALL`, `LC_MESSAGES`, `LANG` — префикс `ru`) — используется **русский** (`internal/locale`).
-- Явно: переменная **`DQ_LANG=en|ru|auto`** (приоритетнее автоопределения) или глобальный флаг **`dq --lang en|ru|auto`** (persistent-флаг; допускается и `dq up --lang ru`).
+- Явно: переменная `**DQ_LANG=en|ru|auto`** (приоритетнее автоопределения) или глобальный флаг `**dq --lang en|ru|auto**` (persistent-флаг; допускается и `dq up --lang ru`).
 - Имя продукта в `dq version` и корневом help: **Docker Quick-ops** (без перевода).
 
 ---
@@ -224,7 +225,7 @@
 2. `**dq.env`** — значения из файла секретов; **перекрывают** совпадающие параметры из YAML (один и тот же ключ задаётся либо в YAML, либо в `dq.env`; при наличии в обоих побеждает `dq.env`).
 3. **Переменные окружения процесса** (включая CI/CD, `export`, systemd) — **наивысший приоритет**; перекрывают и YAML, и `dq.env`.
 
-Параметры, заданные **только** в YAML и отсутствующие в `dq.env` и в env процесса, берутся из YAML. Пустая или отсутствующая строка в `dq.env` не должна затирать значение из YAML без явной договорённости в коде (рекомендация: пустое значение трактовать как «не задано» и не переопределять YAML). Параметр **`DEPLOY_IMAGES=app=ghcr.io/ns/a:1,worker=ghcr.io/ns/w:1`** в `dq.env` или в env процесса **заменяет** мапу **`deploy_images` из YAML**, если строка не пустая (см. реализацию в `internal/config/overlay.go`).
+Параметры, заданные **только** в YAML и отсутствующие в `dq.env` и в env процесса, берутся из YAML. Пустая или отсутствующая строка в `dq.env` не должна затирать значение из YAML без явной договорённости в коде (рекомендация: пустое значение трактовать как «не задано» и не переопределять YAML).
 
 ### 14.2 Удалённый Docker API и SSH-сокет
 
@@ -252,57 +253,59 @@
 
 ### Конфигурация и валидация
 
-- [x] `docker-ops.yaml` / `docker-ops.yml` только в корне проекта
-- [x] `dq.env` и приоритет слияния **§14.1** (YAML → dq.env → env процесса)
-- [x] Дефолты `compose_project_name` (имя каталога), `compose_file`, `compose_service`
-- [x] Команда `dq validate` (YAML, `deploy_mode`, `app_config` на диске, `deploy_build_remote` требует `deploy_mode: artifacts`, синтаксис `dq.env`)
-- [x] Понятные сообщения при синтаксической ошибке YAML (контекст строк, подсказки про отступы)
-- [x] Команда `dq env` (`--output`, `--force`, `--anonymize`)
-- [ ] Расширенная семантическая валидация (например все поля deploy, ssh_identity существует)
+- `docker-ops.yaml` / `docker-ops.yml` только в корне проекта
+- `dq.env` и приоритет слияния **§14.1** (YAML → dq.env → env процесса)
+- Дефолты `compose_project_name` (имя каталога), `compose_file`, `compose_service`
+- Команда `dq validate` (YAML, `deploy_mode`, `app_config` на диске, `deploy_build_remote` требует `deploy_mode: artifacts`, синтаксис `dq.env`)
+- Понятные сообщения при синтаксической ошибке YAML (контекст строк, подсказки про отступы)
+- Команда `dq env` (`--output`, `--force`, `--anonymize`)
+- Расширенная семантическая валидация (например все поля deploy, ssh_identity существует)
 
 ### Локальный режим (Docker Compose через CLI)
 
-- [x] `build`, `pull`, `up`, `down`, `reup`, `ps`, `restart`, `exec`, `status`, `logs`, `logs-tail`
-- [x] Проверка `app_config` перед `up` / `reup`, если путь задан
-- [x] Интеграционный тест с Docker (`-tags=integration`)
-- [x] Требование **Compose V2** (`docker compose`); без fallback на `docker-compose` V1 — при отсутствии плагина показывается инструкция по установке
+- `build`, `pull`, `up`, `down`, `reup`, `ps`, `restart`, `exec`, `status`, `logs`, `logs-tail`
+- Проверка `app_config` перед `up` / `reup`, если путь задан
+- Интеграционный тест с Docker (`-tags=integration`)
+- Требование **Compose V2** (`docker compose`); без fallback на `docker-compose` V1 — при отсутствии плагина показывается инструкция по установке
 
 ### Удалённый режим (без бинарника `dq` на сервере)
 
-- [x] Выполнение compose-команд по **SSH** в `remote_path` (`internal/sshexec`, `internal/remote`) — `build`, `pull`, `up`, `down`, `reup`, `ps`, `restart`, `exec`, `status`, `logs`, `logs-tail`
-- [x] Аутентификация: `ssh_identity` (путь, `~` допускается) и/или **ssh-agent** (`SSH_AUTH_SOCK`)
-- [x] Новые ключи хоста: запись в `~/.ssh/known_hosts` (аналог **accept-new**); смена ключа — отказ
-- [x] TTY / PTY для `logs -f` при интерактивном терминале
-- [x] Отключение remote: `DOCKER_OPS_USE_REMOTE=0` или `use_remote: false` в YAML
+- Выполнение compose-команд по **SSH** в `remote_path` (`internal/sshexec`, `internal/remote`) — `build`, `pull`, `up`, `down`, `reup`, `ps`, `restart`, `exec`, `status`, `logs`, `logs-tail`
+- Аутентификация: `ssh_identity` (путь, `~` допускается) и/или **ssh-agent** (`SSH_AUTH_SOCK`)
+- Новые ключи хоста: запись в `~/.ssh/known_hosts` (аналог **accept-new**); смена ключа — отказ
+- TTY / PTY для `logs -f` при интерактивном терминале
+- Отключение remote: `DOCKER_OPS_USE_REMOTE=0` или `use_remote: false` в YAML
 
 ### Деплой
 
-- [x] **`deploy` в режиме `source`:** SFTP-синхронизация дерева, exclude-лист, `deploy_include`, опционально `app_config`, затем удалённый `reup`
-- [x] **`deploy` в режиме `artifacts`:** `docker build` (локально или с **`deploy_build_remote`** на сервере), ветка registry vs `save`/`load`, доставка `docker-compose.image.yml` и файлов, удалённый `pull`+`up` или только `up`
-- [ ] Маппинг `rsync_extra` → опции встроенного sync (если остаётся в ТЗ)
+- `**deploy` в режиме `source`:** SFTP-синхронизация дерева, exclude-лист, `deploy_include`, опционально `app_config`, затем удалённый `reup`
+- `**deploy` в режиме `artifacts`:** `docker build` (локально или с `**deploy_build_remote`** на сервере), ветка registry vs `save`/`load`, доставка `docker-compose.image.yml` и файлов, удалённый `pull`+`up` или только `up`
+- Маппинг `rsync_extra` → опции встроенного sync (если остаётся в ТЗ)
 
 ### Docker помимо `docker compose` CLI
 
-- [ ] Работа через **docker.sock** / API локально (**§4.4**)
-- [ ] Удалённый Docker API через **SSH-туннель к сокету** (**§14.2**)
+- [x] **docker.sock** / API для transfer и apply (**§4.4**)
+- [x] Удалённый Docker API через **SSH-туннель** (**§14.2**); `remote_docker_socket: auto`
+- [x] **Hash skip** и **layer sync** с fallback на CLI
+- [x] Документация: [docs/ai-operator.md](docs/ai-operator.md), [AGENTS.md](AGENTS.md)
 
 ### CLI, документация, релиз
 
-- [x] Cobra, `dq completion` (bash / zsh / fish / powershell)
-- [x] `dq version` + ldflags из Makefile
-- [x] **man-страницы**: `dq man`, `make gen-man` / `make install-man` (**§4.6**)
-- [x] **GoReleaser** + CI-матрица OS/arch, архивы, checksums (**§7**, `.goreleaser.yaml`, `.github/workflows/`)
-- [ ] Краткая документация по **WSL2** (**§6**)
-- [ ] Таблица миграции полей старых `docker-ops.remote.*` → `docker-ops.yaml` / `dq.env` (**§12**)
+- Cobra, `dq completion` (bash / zsh / fish / powershell)
+- `dq version` + ldflags из Makefile
+- **man-страницы**: `dq man`, `make gen-man` / `make install-man` (**§4.6**)
+- **GoReleaser** + CI-матрица OS/arch, архивы, checksums (**§7**, `.goreleaser.yaml`, `.github/workflows/`)
+- Краткая документация по **WSL2** (**§6**)
+- Таблица миграции полей старых `docker-ops.remote.*` → `docker-ops.yaml` / `dq.env` (**§12**)
 
 ### Локализация
 
-- [x] Сообщения и help: **en по умолчанию**, **ru** при русской локали (**§8**), пакет `internal/locale`
-- [x] Флаг **`--lang`**, переменная **`DQ_LANG`**
+- Сообщения и help: **en по умолчанию**, **ru** при русской локали (**§8**), пакет `internal/locale`
+- Флаг `**--lang`**, переменная `**DQ_LANG**`
 
 ### Прочее
 
-- [ ] Подпись артефактов (cosign и т.д.) — не обязательна в v1 (**§10**)
+- Подпись артефактов (cosign и т.д.) — не обязательна в v1 (**§10**)
 
 ---
 

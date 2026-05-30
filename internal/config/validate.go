@@ -31,6 +31,9 @@ func ValidateBytes(label string, content []byte) error {
 	if err := validateDeployBuildRemote(&cfg); err != nil {
 		return err
 	}
+	if err := validateDeployEngine(&cfg); err != nil {
+		return err
+	}
 	root := filepath.Dir(label)
 	if err := validateAppConfigPath(&cfg, root); err != nil {
 		return err
@@ -55,6 +58,22 @@ func validateDeployBuildRemote(cfg *Config) error {
 		return fmt.Errorf("%s", locale.T("validate.deploy_build_remote_artifacts"))
 	}
 	return nil
+}
+
+func validateDeployEngine(cfg *Config) error {
+	if cfg == nil {
+		return nil
+	}
+	e := strings.TrimSpace(strings.ToLower(cfg.DeployEngine))
+	if e == "" {
+		return nil
+	}
+	switch e {
+	case DeployEngineCompose, DeployEngineAuto, DeployEngineAPI:
+		return nil
+	default:
+		return fmt.Errorf("%s", locale.Tf("validate.deploy_engine", cfg.DeployEngine))
+	}
 }
 
 func validateAppConfigPath(cfg *Config, projectRoot string) error {

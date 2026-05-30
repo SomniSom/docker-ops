@@ -31,6 +31,9 @@ func applyDQEnvMap(c *Config, m map[string]string) {
 		}
 	}
 	set("APP_CONFIG", &c.AppConfig)
+	set("DEPLOY_ENGINE", &c.DeployEngine)
+	set("REMOTE_DOCKER_SOCKET", &c.RemoteDockerSocket)
+	set("REMOTE_DOCKER_SOCKET_SERVICE", &c.RemoteDockerSocketService)
 
 	if v, ok := m["DEPLOY_PUSH"]; ok {
 		if b, ok := parseBoolString(v); ok {
@@ -60,6 +63,16 @@ func applyDQEnvMap(c *Config, m map[string]string) {
 	if v, ok := m["DEPLOY_BUILD_REMOTE"]; ok {
 		if b, ok := parseBoolString(v); ok {
 			c.DeployBuildRemote = boolPtr(b)
+		}
+	}
+	if v, ok := m["DEPLOY_SKIP_UNCHANGED"]; ok {
+		if b, ok := parseBoolString(v); ok {
+			c.DeploySkipUnchanged = boolPtr(b)
+		}
+	}
+	if v, ok := m["DEPLOY_LAYER_SYNC"]; ok {
+		if b, ok := parseBoolString(v); ok {
+			c.DeployLayerSync = boolPtr(b)
 		}
 	}
 	if v, ok := m["DOCKER_OPS_USE_REMOTE"]; ok {
@@ -99,6 +112,9 @@ func overlayProcessEnv(c *Config) {
 		}
 	}
 	set("APP_CONFIG", &c.AppConfig)
+	set("DEPLOY_ENGINE", &c.DeployEngine)
+	set("REMOTE_DOCKER_SOCKET", &c.RemoteDockerSocket)
+	set("REMOTE_DOCKER_SOCKET_SERVICE", &c.RemoteDockerSocketService)
 
 	if v := os.Getenv("DEPLOY_PUSH"); v != "" {
 		if b, ok := parseBoolString(v); ok {
@@ -128,6 +144,16 @@ func overlayProcessEnv(c *Config) {
 	if v := os.Getenv("DEPLOY_BUILD_REMOTE"); v != "" {
 		if b, ok := parseBoolString(v); ok {
 			c.DeployBuildRemote = boolPtr(b)
+		}
+	}
+	if v := os.Getenv("DEPLOY_SKIP_UNCHANGED"); v != "" {
+		if b, ok := parseBoolString(v); ok {
+			c.DeploySkipUnchanged = boolPtr(b)
+		}
+	}
+	if v := os.Getenv("DEPLOY_LAYER_SYNC"); v != "" {
+		if b, ok := parseBoolString(v); ok {
+			c.DeployLayerSync = boolPtr(b)
 		}
 	}
 	if v := os.Getenv("DOCKER_OPS_USE_REMOTE"); v != "" {

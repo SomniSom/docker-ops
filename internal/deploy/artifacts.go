@@ -1,6 +1,7 @@
 package deploy
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -11,12 +12,11 @@ import (
 	"github.com/pkg/sftp"
 
 	"github.com/SomniSom/docker-ops/internal/config"
+	"github.com/SomniSom/docker-ops/internal/dockerapi"
 	"github.com/SomniSom/docker-ops/internal/locale"
 	"github.com/SomniSom/docker-ops/internal/sshexec"
 	"golang.org/x/crypto/ssh"
 )
-
-const artifactsComposeFile = "docker-compose.image.yml"
 
 // RunArtifacts builds/pushes or save-loads the image(s), syncs compose + config + includes, then remote pull+up or up (readme §5.3).
 func RunArtifacts(projectRoot string, cfg *config.Config, opts RunOpts) error {
@@ -45,6 +45,7 @@ func RunArtifacts(projectRoot string, cfg *config.Config, opts RunOpts) error {
 	}
 
 	useSL := ArtifactsUseSaveLoad(cfg)
+	ctx := context.Background()
 
 	client, err := sshexec.Dial(cfg)
 	if err != nil {
@@ -52,14 +53,16 @@ func RunArtifacts(projectRoot string, cfg *config.Config, opts RunOpts) error {
 	}
 	defer client.Close()
 
-	if useSL {
-		if err := dockerSaveLoadMulti(client, projectRoot, imageRefs, EffectiveSaveCompress(cfg)); err != nil {
+	tOpts := buildTransferOpts(cfg, opts, useSL, true)
+	var remoteSess *dockerapi.RemoteSession
+	if len(imageRefs) > 0 && (useSL || EffectiveDeployPush(cfg) || opts.Build) {
+		remoteSess, err = transferArtifactsImages(ctx, client, cfg, projectRoot, imageRefs, tOpts)
+		if err != nil {
 			return err
 		}
-	} else if !useSL && (EffectiveDeployPush(cfg) || opts.Build) {
-		if err := dockerPushMulti(projectRoot, imageRefs); err != nil {
-			return err
-		}
+	}
+	if remoteSess != nil {
+		defer remoteSess.Close()
 	}
 
 	rp := strings.TrimSpace(cfg.RemotePath)
@@ -101,78 +104,10 @@ func RunArtifacts(projectRoot string, cfg *config.Config, opts RunOpts) error {
 		return err
 	}
 	exportDeployImage := strings.Contains(string(composeBytes), "${DEPLOY_IMAGE}")
-	return RunRemoteArtifactsFinish(client, cfg, artifactsComposeFile, skipPull, exportDeployImage)
+	return RunArtifactsFinish(ctx, client, cfg, artifactsComposeFile, skipPull, exportDeployImage, composeLocal, projectRoot, remoteSess)
 }
 
-// runArtifactsRemoteBuild mirrors the project over SFTP, runs docker build on the remote host,
-// optionally docker push (when not save/load), then remote compose up (readme deploy_build_remote).
-func runArtifactsRemoteBuild(projectRoot string, cfg *config.Config, opts RunOpts, baseComposeBytes []byte, composeLocal string) error {
-	rp := strings.TrimSpace(cfg.RemotePath)
-
-	client, err := sshexec.Dial(cfg)
-	if err != nil {
-		return err
-	}
-	defer client.Close()
-
-	if err := sshexec.RunBash(client, "mkdir -p "+sshexec.ShellQuote(rp), false); err != nil {
-		return fmt.Errorf("%s: %w", locale.T("deploy.src.remote_mkdir"), err)
-	}
-
-	c, err := sftp.NewClient(client)
-	if err != nil {
-		return fmt.Errorf("%s: %w", locale.T("deploy.src.sftp"), err)
-	}
-
-	fmt.Fprint(os.Stderr, locale.T("deploy.art.mirror_remote"))
-	patterns := MergeExcludePatterns(cfg)
-	if err := MirrorProjectTree(c, projectRoot, rp, patterns); err != nil {
-		_ = c.Close()
-		return err
-	}
-	if err := UploadAppConfig(c, projectRoot, rp, cfg); err != nil {
-		_ = c.Close()
-		return err
-	}
-	if err := SyncDeployIncludes(c, projectRoot, rp, cfg); err != nil {
-		_ = c.Close()
-		return err
-	}
-	remCompose := remoteJoin(rp, artifactsComposeFile)
-	if err := putLocalFile(c, composeLocal, remCompose); err != nil {
-		_ = c.Close()
-		return fmt.Errorf("%s: %w", locale.T("deploy.art.upload"), err)
-	}
-	if err := c.Close(); err != nil {
-		return err
-	}
-
-	imageRefs, err := runRemoteArtifactBuilds(client, projectRoot, rp, cfg, opts, baseComposeBytes)
-	if err != nil {
-		return err
-	}
-
-	useSL := ArtifactsUseSaveLoad(cfg)
-	if !useSL && (EffectiveDeployPush(cfg) || opts.Build) {
-		if err := dockerPushMultiRemote(client, imageRefs); err != nil {
-			return err
-		}
-	}
-
-	skipPull := useSL
-	if skipPull {
-		fmt.Fprint(os.Stderr, locale.T("deploy.art.remote_up_sl"))
-	} else {
-		fmt.Fprint(os.Stderr, locale.T("deploy.art.remote_pull"))
-	}
-
-	composeBytes, err := os.ReadFile(composeLocal)
-	if err != nil {
-		return err
-	}
-	exportDeployImage := strings.Contains(string(composeBytes), "${DEPLOY_IMAGE}")
-	return RunRemoteArtifactsFinish(client, cfg, artifactsComposeFile, skipPull, exportDeployImage)
-}
+const artifactsComposeFile = "docker-compose.image.yml"
 
 func putLocalFile(c *sftp.Client, localPath, rem string) error {
 	st, err := os.Stat(localPath)
@@ -226,4 +161,86 @@ func dockerSaveLoad(client *ssh.Client, projectRoot, image string, compress bool
 		return err
 	}
 	return waitErr
+}
+
+// runArtifactsRemoteBuild mirrors the project over SFTP, runs docker build on the remote host,
+// optionally docker push (when not save/load), then remote compose up (readme deploy_build_remote).
+func runArtifactsRemoteBuild(projectRoot string, cfg *config.Config, opts RunOpts, baseComposeBytes []byte, composeLocal string) error {
+	rp := strings.TrimSpace(cfg.RemotePath)
+	ctx := context.Background()
+
+	client, err := sshexec.Dial(cfg)
+	if err != nil {
+		return err
+	}
+	defer client.Close()
+
+	if err := sshexec.RunBash(client, "mkdir -p "+sshexec.ShellQuote(rp), false); err != nil {
+		return fmt.Errorf("%s: %w", locale.T("deploy.src.remote_mkdir"), err)
+	}
+
+	c, err := sftp.NewClient(client)
+	if err != nil {
+		return fmt.Errorf("%s: %w", locale.T("deploy.src.sftp"), err)
+	}
+
+	fmt.Fprint(os.Stderr, locale.T("deploy.art.mirror_remote"))
+	patterns := MergeExcludePatterns(cfg)
+	if err := MirrorProjectTree(c, projectRoot, rp, patterns); err != nil {
+		_ = c.Close()
+		return err
+	}
+	if err := UploadAppConfig(c, projectRoot, rp, cfg); err != nil {
+		_ = c.Close()
+		return err
+	}
+	if err := SyncDeployIncludes(c, projectRoot, rp, cfg); err != nil {
+		_ = c.Close()
+		return err
+	}
+	remCompose := remoteJoin(rp, artifactsComposeFile)
+	if err := putLocalFile(c, composeLocal, remCompose); err != nil {
+		_ = c.Close()
+		return fmt.Errorf("%s: %w", locale.T("deploy.art.upload"), err)
+	}
+	if err := c.Close(); err != nil {
+		return err
+	}
+
+	imageRefs, err := runRemoteArtifactBuilds(client, projectRoot, rp, cfg, opts, baseComposeBytes)
+	if err != nil {
+		return err
+	}
+
+	useSL := ArtifactsUseSaveLoad(cfg)
+	var remoteSess *dockerapi.RemoteSession
+	if config.UsesDeployAPI(cfg) {
+		remoteSess, err = dockerapi.TryOpenRemote(ctx, client, cfg)
+		if err != nil && config.EffectiveDeployEngine(cfg) == config.DeployEngineAPI {
+			return err
+		}
+	}
+	if remoteSess != nil {
+		defer remoteSess.Close()
+	}
+
+	if !useSL && (EffectiveDeployPush(cfg) || opts.Build) {
+		if err := dockerPushMultiRemote(client, imageRefs); err != nil {
+			return err
+		}
+	}
+
+	skipPull := useSL
+	if skipPull {
+		fmt.Fprint(os.Stderr, locale.T("deploy.art.remote_up_sl"))
+	} else {
+		fmt.Fprint(os.Stderr, locale.T("deploy.art.remote_pull"))
+	}
+
+	composeBytes, err := os.ReadFile(composeLocal)
+	if err != nil {
+		return err
+	}
+	exportDeployImage := strings.Contains(string(composeBytes), "${DEPLOY_IMAGE}")
+	return RunArtifactsFinish(ctx, client, cfg, artifactsComposeFile, skipPull, exportDeployImage, composeLocal, projectRoot, remoteSess)
 }

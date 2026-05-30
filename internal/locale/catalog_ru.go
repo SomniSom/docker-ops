@@ -160,6 +160,24 @@ Fish:
 	"deploy.art.build_remote_svc": "==> удалённо: docker build -t %s (сервис %s)\n",
 	"deploy.art.push_remote":   "==> удалённо: docker push %s\n",
 
+	"deploy.skip_unchanged":      "==> пропуск передачи образа (без изменений): %s\n",
+	"deploy.api.err.parse_compose": "разбор compose для API apply",
+	"deploy.api.err.no_image":      "у сервиса %q нет image в compose",
+	"deploy.api.err.create":        "создание контейнера для %q",
+	"deploy.api.err.start":         "запуск контейнера для %q",
+	"deploy.api.err.no_client":     "deploy_engine=api требует Docker API-туннель на удалённый хост",
+	"deploy.api.fallback_compose":  "==> API apply недоступен; fallback на docker compose\n",
+	"deploy.api.fallback_compose_err": "==> API apply не удался (%v); fallback на docker compose\n",
+	"deploy.api.transfer_fallback":    "==> API-передача образа не удалась (%v); fallback на docker save|load\n",
+	"deploy.api.skip_unchanged":       "==> пропуск пересоздания сервиса (без изменений): %s\n",
+	"deploy.api.started":              "==> API запустил сервис: %s\n",
+
+	"dockerapi.socket_resolved":       "==> удалённый docker socket: %s (источник: %s)\n",
+	"dockerapi.err.no_socket":         "не удалось определить Docker socket на сервере; задайте remote_docker_socket в docker-ops.yaml",
+	"dockerapi.warn.multiple_sockets": "dq: предупреждение: найдено несколько docker socket (%s); выбран предпочтительный путь — задайте remote_docker_socket явно\n",
+
+	"validate.deploy_engine": "deploy_engine должен быть compose, auto или api (получено %q)",
+
 	"deploy.inc.skip_abs":    "dq: deploy_include: пропуск абсолютного пути %q\n",
 	"deploy.inc.skip_unsafe": "dq: deploy_include: пропуск небезопасного пути %q\n",
 	"deploy.inc.missing":     "dq: предупреждение: deploy_include: нет %s\n",

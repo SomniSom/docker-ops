@@ -76,9 +76,10 @@
 
 ### 4.4 Docker interaction
 
-- **Current:** only **`docker compose`** (**Compose V2** plugin for Docker CLI). Standalone **`docker-compose` (V1) is not supported** — if the plugin is missing, `dq` prints install hints (see Docker docs). Same locally and **on the remote host over SSH** (remote shell runs commands; **`dq` is not installed on the server**).
-- **Extensions:** may use `**docker.sock**` (local Docker API).
-- **Planned:** **HTTP Docker API** (including **remote** hosts). Access on the server via **SSH to the Docker socket** (`/var/run/docker.sock` on the remote host): forward/tunnel in the SSH session (local Unix socket or TCP proxy on the client), without exposing the Docker API on the network. Transport details — in implementation (see **§14.2**).
+- **Default:** **`docker compose`** (**Compose V2** plugin). Standalone **`docker-compose` (V1) is not supported**. Same locally and **on the remote host over SSH** (`dq` is **not installed on the server**).
+- **Opt-in (artifacts):** **Docker Engine HTTP API** via **`docker.sock`** on the remote host. Access: **SSH streamlocal tunnel** to the socket (see **§14.2**); `remote_docker_socket: auto` detects path (`DOCKER_HOST`, docker context, systemd, probe). Config: **`deploy_engine`**: `compose` (default), `auto` (API + compose fallback), `api` (API finish only).
+- **Optimizations (when API tunnel available):** **`deploy_skip_unchanged`** — skip image transfer if digest matches; **`deploy_layer_sync`** — partial layer tar in save/load mode (fallback: full save).
+- Operator / AI guide: **[docs/ai-operator.md](docs/ai-operator.md)**, **[AGENTS.md](AGENTS.md)**.
 
 ### 4.5 Remote execution (no `dq` on server)
 
@@ -132,7 +133,7 @@ Minimal set (snake_case in YAML):
 **`deploy`:**
 
 - **`source`:** directory on server, tree sync with exclude, copy **app_config** when configured and file exists, then remote `reup`.
-- **`artifacts`:** when **`deploy_push: true`** or **`dq deploy --build`**, images are built with **`docker build`** — by default on **this machine**, then save/load or registry as configured. With **`deploy_build_remote: true`** (only with **`deploy_mode: artifacts`**, e.g. **`DEPLOY_BUILD_REMOTE=1`**) the tree is **mirrored over SFTP** (like `source`, honoring **`exclude`**) and **`docker build`** / **registry `docker push`** (when not save/load) run **on the server**; local Docker is not required for the build. The same **image tags** apply: **`deploy_image`**, or **`deploy_images`** in YAML, or **`DEPLOY_IMAGES=…`** in env — including when resolving **which** `docker build -t …` and push commands run (locally or on the server). Registry vs save/load; deliver `docker-compose.image.yml`, **app_config** if set, `deploy_include`; on the server: `config-check` (if applicable) → `up` or `pull`+`up`. **The `dq` binary is not copied to the server.** Draft `docker-compose.image.yml`: **`dq gen-image-compose`**. For several built services, **`deploy_images`** / **`DEPLOY_IMAGES`** and **`dq gen-image-compose --all-built`**; if no multi-image config, the single-**`deploy_image`** (or `DEPLOY_IMAGE`) flow applies.
+- **`artifacts`:** when **`deploy_push: true`** or **`dq deploy --build`**, images are built with **`docker build`** — by default on **this machine**, then save/load or registry as configured. With **`deploy_build_remote: true`** (only with **`deploy_mode: artifacts`**) the tree is mirrored over SFTP and build/push run on the server. Image tags: **`deploy_image`**, **`deploy_images`**, or **`DEPLOY_IMAGES`**. Deliver `docker-compose.image.yml`, **app_config**, `deploy_include`. On the server: **`deploy_engine: compose`** (default) → `pull`+`up` or `up`; **`deploy_engine: auto|api`** → Docker API apply via SSH **`docker.sock`** tunnel (auto falls back to compose). **`deploy_skip_unchanged`** / **`deploy_layer_sync`** optimize transfer when API tunnel is available. Draft compose: **`dq gen-image-compose`**. Multi-service: **`deploy_images`** + **`dq gen-image-compose --all-built`**. See **[docs/ai-operator.md](docs/ai-operator.md)**.
 - **Data on server (`artifacts`):** by default the whole `remote_path` **project** tree is **not** fully mirrored (only the compose, image delivery, and configured paths) — extra dirs (e.g. **`db-data`**) are **not** removed unless in **`deploy_include`**. If you use **`deploy_build_remote`**, a **full** mirror to `remote_path` runs for the build (see **`exclude`**). In all cases, ensure **`docker-compose.image.yml`** uses the same volume path for DB data, etc. **`source`** can delete server-only extras during sync — riskier for a live DB inside the project tree.
 
 ### 5.4 `env` command (template)
@@ -277,8 +278,10 @@ Legend: `[x]` done · `[ ]` not done / planned.
 
 ### Docker beyond `docker compose` CLI
 
-- [ ] Local **docker.sock** / API (**§4.4**)
-- [ ] Remote Docker API via **SSH tunnel to socket** (**§14.2**)
+- [x] Local **docker.sock** / API for deploy transfer & apply (**§4.4**)
+- [x] Remote Docker API via **SSH tunnel to socket** (**§14.2**); `remote_docker_socket: auto`
+- [x] **Hash skip** (`deploy_skip_unchanged`) and **layer sync** (`deploy_layer_sync`) with CLI fallback
+- [x] **AI/operator docs:** [docs/ai-operator.md](docs/ai-operator.md), [AGENTS.md](AGENTS.md)
 
 ### CLI, docs, release
 

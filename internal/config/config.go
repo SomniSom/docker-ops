@@ -32,6 +32,14 @@ type Config struct {
 	AppConfig          string   `yaml:"app_config"`
 	HelpShowEffective  *bool    `yaml:"help_show_effective"`
 	UseRemote          *bool    `yaml:"use_remote"` // false => force local (DOCKER_OPS_USE_REMOTE=0)
+	// DeployEngine controls artifacts finish: compose (default), auto (API with compose fallback), api.
+	DeployEngine string `yaml:"deploy_engine"`
+	// RemoteDockerSocket is unix path on remote host, or "auto" to detect (used with deploy_engine auto|api).
+	RemoteDockerSocket string `yaml:"remote_docker_socket"`
+	// RemoteDockerSocketService optional systemd unit to inspect for socket path (e.g. docker.socket).
+	RemoteDockerSocketService string `yaml:"remote_docker_socket_service"`
+	DeploySkipUnchanged       *bool  `yaml:"deploy_skip_unchanged"`
+	DeployLayerSync           *bool  `yaml:"deploy_layer_sync"`
 }
 
 // RemoteConfigured reports whether remote SSH mode is available (§5.1).

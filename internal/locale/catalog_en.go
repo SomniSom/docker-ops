@@ -27,7 +27,9 @@ and that app_config exists on disk if set.`,
 
 Source (default): mirror project tree with excludes (size/mtime), deploy_include, app_config, then remote reup.
 
-Artifacts: requires docker-compose.image.yml. Single image: deploy_image. Multiple built services: deploy_images (map service name → image tag) and dq gen-image-compose --all-built with matching deploy_images; each service is docker built from its compose build context. Optional docker build/push or save|ssh|load; then remote pull+up or up. Flag --build runs local docker build for every image before save/load (or push) even if deploy_push is unset. With deploy_build_remote: true and a build (--build or deploy_push), the project tree is mirrored over SFTP and docker build (and registry push when not save/load) runs on the remote host instead of locally.`,
+Artifacts: requires docker-compose.image.yml. Single image: deploy_image. Multiple built services: deploy_images (map service name → image tag) and dq gen-image-compose --all-built with matching deploy_images; each service is docker built from its compose build context. Optional docker build/push or save|ssh|load; then remote pull+up or up. Flag --build runs local docker build for every image before save/load (or push) even if deploy_push is unset. With deploy_build_remote: true and a build (--build or deploy_push), the project tree is mirrored over SFTP and docker build (and registry push when not save/load) runs on the remote host instead of locally.
+
+Default deploy_engine is compose (backward compatible). Set deploy_engine to auto or api for Docker Engine API apply via SSH docker.sock tunnel (artifacts only); auto falls back to compose on failure. deploy_skip_unchanged and deploy_layer_sync optimize image transfer when API tunnel is available.`,
 	"deploy.err.needs_remote": "deploy needs remote_ssh and remote_path (docker-ops.yml or dq.env); run 'dq validate' to check the file",
 	"deploy.flag.build":       "artifacts: docker build -t deploy_image, then save/load or push as configured",
 
@@ -160,6 +162,24 @@ Docker said: %s`,
 	"deploy.art.build_remote":  "==> remote: docker build -t %s\n",
 	"deploy.art.build_remote_svc": "==> remote: docker build -t %s (service %s)\n",
 	"deploy.art.push_remote":   "==> remote: docker push %s\n",
+
+	"deploy.skip_unchanged":      "==> skip image transfer (unchanged): %s\n",
+	"deploy.api.err.parse_compose": "parse compose for API apply",
+	"deploy.api.err.no_image":      "service %q has no image in compose file",
+	"deploy.api.err.create":        "create container for %q",
+	"deploy.api.err.start":         "start container for %q",
+	"deploy.api.err.no_client":     "deploy_engine=api requires Docker API tunnel to remote host",
+	"deploy.api.fallback_compose":  "==> API apply unavailable; falling back to docker compose\n",
+	"deploy.api.fallback_compose_err": "==> API apply failed (%v); falling back to docker compose\n",
+	"deploy.api.transfer_fallback":    "==> API image transfer failed (%v); falling back to docker save|load\n",
+	"deploy.api.skip_unchanged":       "==> skip service recreate (unchanged): %s\n",
+	"deploy.api.started":              "==> API started service: %s\n",
+
+	"dockerapi.socket_resolved":       "==> remote docker socket: %s (from %s)\n",
+	"dockerapi.err.no_socket":         "could not detect remote Docker socket; set remote_docker_socket in docker-ops.yaml",
+	"dockerapi.warn.multiple_sockets": "dq: warning: multiple docker sockets found (%s); using preferred path — set remote_docker_socket explicitly\n",
+
+	"validate.deploy_engine": "deploy_engine must be compose, auto, or api (got %q)",
 
 	"deploy.inc.skip_abs":    "dq: deploy_include: skip absolute path %q\n",
 	"deploy.inc.skip_unsafe": "dq: deploy_include: skip unsafe path %q\n",
