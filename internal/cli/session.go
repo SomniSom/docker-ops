@@ -82,6 +82,22 @@ func (s *composeSession) composeOutput(args ...string) ([]byte, error) {
 	return remote.DockerComposeOutput(s.cfg, s.localRoot, args...)
 }
 
+// dockerRun executes docker (not compose) locally or over SSH.
+func (s *composeSession) dockerRun(args ...string) error {
+	if s.cfg != nil && s.cfg.RemoteConfigured() {
+		return remote.RunDocker(s.cfg, args...)
+	}
+	cmd := exec.Command("docker", args...)
+	cmd.Dir = s.localRoot
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	cmd.Stdin = os.Stdin
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("%s: %w", locale.T("compose.run_prefix"), err)
+	}
+	return nil
+}
+
 // dockerOutput runs docker and returns stdout (local or remote).
 func (s *composeSession) dockerOutput(args ...string) ([]byte, error) {
 	if s.local != nil {

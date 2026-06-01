@@ -30,6 +30,18 @@ Artifacts: нужен docker-compose.image.yml. Один образ: deploy_imag
 	"deploy.err.needs_remote": "для deploy нужны remote_ssh и remote_path (docker-ops.yml или dq.env); выполните «dq validate»",
 	"deploy.flag.build":       "artifacts: docker build -t deploy_image, затем save/load или push по настройкам",
 
+	"clean.short": "Очистить неиспользуемые данные Docker на хосте (docker system prune)",
+	"clean.long": `Запускает docker system prune на удалённом хосте (или локально, если remote не настроен).
+
+По умолчанию удаляет остановленные контейнеры, неиспользуемые сети и dangling-образы. Тома и образы, на которые ссылается контейнер, не трогает.
+
+--all-images (-a) — также удалить все неиспользуемые образы (старые теги деплоя). --volumes (-v) — только если осознанно удаляете неиспользуемые тома. --build-cache — дополнительно docker builder prune.`,
+	"clean.step.system_prune": "==> docker system prune\n",
+	"clean.step.build_cache":  "==> docker builder prune\n",
+	"clean.flag.all_images":   "удалить все неиспользуемые образы (docker system prune -a)",
+	"clean.flag.volumes":      "удалить неиспользуемые тома (опасно: возможна потеря данных БД)",
+	"clean.flag.build_cache":  "дополнительно docker builder prune -f",
+
 	"build.short":   "docker compose build --pull",
 	"pull.short":    "docker compose pull",
 	"up.short":      "docker compose up -d",

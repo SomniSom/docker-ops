@@ -68,6 +68,19 @@ func DockerComposeOutput(cfg *config.Config, projectRoot string, composeArgs ...
 	return sshexec.RunBashCapture(client, script)
 }
 
+// RunDocker runs `docker` on the remote host (stdout/stderr inherited).
+func RunDocker(cfg *config.Config, dockerArgs ...string) error {
+	if cfg == nil || !cfg.RemoteConfigured() {
+		return errors.New(locale.T("err.remote_ssh"))
+	}
+	client, err := sshexec.Dial(cfg)
+	if err != nil {
+		return err
+	}
+	defer client.Close()
+	return sshexec.RunBash(client, dockerScript(cfg, dockerArgs...), false)
+}
+
 // DockerOutput runs docker on the remote host and returns stdout.
 func DockerOutput(cfg *config.Config, dockerArgs ...string) ([]byte, error) {
 	if cfg == nil || !cfg.RemoteConfigured() {
@@ -78,11 +91,17 @@ func DockerOutput(cfg *config.Config, dockerArgs ...string) ([]byte, error) {
 		return nil, err
 	}
 	defer client.Close()
+	return sshexec.RunBashCapture(client, dockerScript(cfg, dockerArgs...))
+}
+
+func dockerScript(cfg *config.Config, dockerArgs ...string) string {
 	script := "docker " + sshexec.QuoteArgs(dockerArgs)
-	if rp := strings.TrimSpace(cfg.RemotePath); rp != "" {
-		script = "cd " + sshexec.ShellQuote(rp) + " && " + script
+	if cfg != nil {
+		if rp := strings.TrimSpace(cfg.RemotePath); cfg.RemoteConfigured() && rp != "" {
+			script = "cd " + sshexec.ShellQuote(rp) + " && " + script
+		}
 	}
-	return sshexec.RunBashCapture(client, script)
+	return script
 }
 
 func dockerComposeScript(cfg *config.Config, projectRoot, composeFileOverride string, composeArgs ...string) (string, error) {

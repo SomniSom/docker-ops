@@ -1,6 +1,7 @@
 /bin/
 /dist/
 .cursor/
+.continuum/
 *.exe
 *.test
 coverage.out

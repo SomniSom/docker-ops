@@ -4,6 +4,7 @@ Before changing **deploy**, **remote SSH**, or **Docker** integration in this re
 
 1. Read [readme.md](readme.md) (spec) §5.3, §12.1, §12.2.
 2. Read [docs/ai-operator.md](docs/ai-operator.md) (decision trees, must-ask questions, backward compatibility).
+3. In Cursor, call Continuum MCP **`read_project_guidelines`** (see `.cursor/mcp.json`) for stored ADRs; update via **`store_architectural_decision`** when architecture changes.
 
 ## Do
 

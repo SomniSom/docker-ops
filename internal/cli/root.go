@@ -48,6 +48,7 @@ func NewRoot() *cobra.Command {
 		root.AddCommand(c)
 	}
 	root.AddCommand(newDeployCmd(&projectDir))
+	root.AddCommand(newCleanCmd(&projectDir))
 	root.AddCommand(newGenImageComposeCmd(&projectDir))
 	root.AddCommand(newCompletionCmd(root))
 	root.AddCommand(newManCmd(root))
