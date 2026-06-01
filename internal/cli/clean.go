@@ -1,16 +1,13 @@
 package cli
 
 import (
-	"fmt"
-	"os"
-
 	"github.com/SomniSom/docker-ops/internal/compose"
 	"github.com/SomniSom/docker-ops/internal/locale"
 	"github.com/spf13/cobra"
 )
 
 func newCleanCmd(projectDir *string) *cobra.Command {
-	var allImages, volumes, buildCache bool
+	var allImages, volumes bool
 	c := &cobra.Command{
 		Use:   "clean",
 		Short: locale.T("clean.short"),
@@ -20,21 +17,11 @@ func newCleanCmd(projectDir *string) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			pruneArgs := buildSystemPruneArgs(allImages, volumes)
-			fmt.Fprint(os.Stderr, locale.T("clean.step.system_prune"))
-			if err := s.dockerRun(pruneArgs...); err != nil {
-				return err
-			}
-			if buildCache {
-				fmt.Fprint(os.Stderr, locale.T("clean.step.build_cache"))
-				return s.dockerRun("builder", "prune", "-f")
-			}
-			return nil
+			return runProjectClean(s, cleanOpts{AllImages: allImages, Volumes: volumes})
 		},
 	}
 	c.Flags().BoolVarP(&allImages, "all-images", "a", false, locale.T("clean.flag.all_images"))
 	c.Flags().BoolVarP(&volumes, "volumes", "v", false, locale.T("clean.flag.volumes"))
-	c.Flags().BoolVar(&buildCache, "build-cache", false, locale.T("clean.flag.build_cache"))
 	return c
 }
 

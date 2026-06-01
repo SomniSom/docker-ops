@@ -33,17 +33,21 @@ Default deploy_engine is compose (backward compatible). Set deploy_engine to aut
 	"deploy.err.needs_remote": "deploy needs remote_ssh and remote_path (docker-ops.yml or dq.env); run 'dq validate' to check the file",
 	"deploy.flag.build":       "artifacts: docker build -t deploy_image, then save/load or push as configured",
 
-	"clean.short": "Remove unused Docker data on the host (docker system prune)",
-	"clean.long": `Run docker system prune on the remote host (or locally when remote is not configured).
+	"clean.short": "Remove unused Docker artifacts for this compose project on the remote host",
+	"clean.long": `Clean the remote host (remote_ssh / remote_path required) from unused Docker data belonging only to this project's compose_project_name.
 
-By default removes stopped containers, unused networks, and dangling images. Does not remove volumes or images still referenced by a container.
+Default: remove stopped containers, unused networks, and configured project images (deploy_image, deploy_images, images from compose file) that no running container uses. Other projects on the same server are not affected.
 
-Use --all-images (-a) to also remove unused images (e.g. old deploy tags). Use --volumes (-v) only when you accept deleting unused volume data. Use --build-cache to run docker builder prune after system prune.`,
-	"clean.step.system_prune": "==> docker system prune\n",
-	"clean.step.build_cache":  "==> docker builder prune\n",
-	"clean.flag.all_images":   "also remove all unused images (docker system prune -a)",
-	"clean.flag.volumes":      "also remove unused volumes (destructive; may delete DB data if volume is unreferenced)",
-	"clean.flag.build_cache":  "also run docker builder prune -f",
+-a / --all-images: remove all unused tags of the same image repository (e.g. every unused downloadbot:*), not only the configured ref.
+
+-v / --volumes: remove unused volumes labeled with this compose project (destructive if a DB volume is unreferenced).`,
+	"clean.err.needs_remote": "clean requires remote_ssh and remote_path — it only cleans the remote host for this project",
+	"clean.err.no_project":   "compose_project_name is empty",
+	"clean.step.project":     "==> clean compose project %s on remote host\n",
+	"clean.step.rmi":         "==> docker rmi %s\n",
+	"clean.step.volume_rm":   "==> docker volume rm %s\n",
+	"clean.flag.all_images":  "remove all unused tags of project image repositories (not only deploy_image)",
+	"clean.flag.volumes":     "remove unused volumes for this compose project (destructive)",
 
 	"build.short":   "docker compose build --pull",
 	"pull.short":    "docker compose pull",

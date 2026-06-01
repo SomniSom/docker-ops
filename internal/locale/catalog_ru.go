@@ -30,17 +30,21 @@ Artifacts: нужен docker-compose.image.yml. Один образ: deploy_imag
 	"deploy.err.needs_remote": "для deploy нужны remote_ssh и remote_path (docker-ops.yml или dq.env); выполните «dq validate»",
 	"deploy.flag.build":       "artifacts: docker build -t deploy_image, затем save/load или push по настройкам",
 
-	"clean.short": "Очистить неиспользуемые данные Docker на хосте (docker system prune)",
-	"clean.long": `Запускает docker system prune на удалённом хосте (или локально, если remote не настроен).
+	"clean.short": "Очистить на удалённом хосте неиспользуемые Docker-артефакты только этого compose-проекта",
+	"clean.long": `Очищает удалённый хост (нужны remote_ssh и remote_path) от неиспользуемых данных Docker только для compose_project_name этого проекта.
 
-По умолчанию удаляет остановленные контейнеры, неиспользуемые сети и dangling-образы. Тома и образы, на которые ссылается контейнер, не трогает.
+По умолчанию: остановленные контейнеры, неиспользуемые сети и образы проекта (deploy_image, deploy_images, image из compose), которые не использует ни один запущенный контейнер. Другие проекты на сервере не затрагиваются.
 
---all-images (-a) — также удалить все неиспользуемые образы (старые теги деплоя). --volumes (-v) — только если осознанно удаляете неиспользуемые тома. --build-cache — дополнительно docker builder prune.`,
-	"clean.step.system_prune": "==> docker system prune\n",
-	"clean.step.build_cache":  "==> docker builder prune\n",
-	"clean.flag.all_images":   "удалить все неиспользуемые образы (docker system prune -a)",
-	"clean.flag.volumes":      "удалить неиспользуемые тома (опасно: возможна потеря данных БД)",
-	"clean.flag.build_cache":  "дополнительно docker builder prune -f",
+-a / --all-images: удалить все неиспользуемые теги того же репозитория образа (например все лишние downloadbot:*), не только ref из конфига.
+
+-v / --volumes: удалить неиспользуемые тома с меткой этого compose-проекта (опасно для БД, если том «осиротел»).`,
+	"clean.err.needs_remote": "clean требует remote_ssh и remote_path — очистка только на удалённом хосте для этого проекта",
+	"clean.err.no_project":   "compose_project_name не задан",
+	"clean.step.project":     "==> очистка compose-проекта %s на удалённом хосте\n",
+	"clean.step.rmi":         "==> docker rmi %s\n",
+	"clean.step.volume_rm":   "==> docker volume rm %s\n",
+	"clean.flag.all_images":  "удалить все неиспользуемые теги репозиториев образов проекта",
+	"clean.flag.volumes":     "удалить неиспользуемые тома этого compose-проекта (опасно)",
 
 	"build.short":   "docker compose build --pull",
 	"pull.short":    "docker compose pull",
